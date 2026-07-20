@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: ct-italo-vieira-portal
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SESSION_TTL_SECONDS
+        value: "43200"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_PASSWORD_HASH
+        sync: false
+      - key: PROFESSOR_PASSWORD_HASHES_JSON
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: CONTROLE_PROFESSORES_SHEET_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: NEXTFIT_API_KEY
+        sync: false
+      - key: NEXTFIT_BASE_URL
+        value: https://integracao.nextfit.com.br
+      - key: NEXTFIT_API_VERSION
+        value: "1"
+      - key: NEXTFIT_V2_TOKEN
+        sync: false
+      - key: NEXTFIT_V2_REFRESH_TOKEN
+        sync: false
+      - key: NEXTFIT_CODIGO_UNIDADE
+        sync: false

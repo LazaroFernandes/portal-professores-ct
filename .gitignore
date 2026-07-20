@@ -1,0 +1,10 @@
+.env
+.venv/
+credentials/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.py[cod]
+*.log
+scripts/_painel_segunda.json
+scripts/_painel_segunda_hist.json

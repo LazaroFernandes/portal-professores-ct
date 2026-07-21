@@ -19,7 +19,8 @@ export default function App() {
   const { session } = useAuth();
   return <Suspense fallback={<Loading label="Carregando módulo…" />}><Routes>
     <Route path="/login" element={<LoginPage />} />
-    <Route path="/frequencia" element={<Protected><FrequencyPage /></Protected>} />
-    <Route path="*" element={<Navigate to={session?.role === "admin" ? "/frequencia" : "/login"} replace />} />
+    <Route path="/vencimentos" element={<Protected><FrequencyPage /></Protected>} />
+    <Route path="/frequencia" element={<Navigate to="/vencimentos" replace />} />
+    <Route path="*" element={<Navigate to={session?.role === "admin" ? "/vencimentos" : "/login"} replace />} />
   </Routes></Suspense>;
 }

@@ -14,8 +14,8 @@ from nextfit_client import NextFitClient
 
 logger = logging.getLogger("nextfit.frequency")
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
-CACHE_TAB = "DashboardFrequencia"
-WINDOW_DAYS = 3
+CACHE_TAB = "DashboardVencimentos"
+GRACE_DAYS = 3
 _refresh_lock = threading.Lock()
 
 
@@ -75,65 +75,81 @@ def _active_contracts(contracts: list[dict], now: datetime) -> dict[int, list[di
     return result
 
 
+def _contracts_by_client(contracts: list[dict]) -> dict[int, list[dict]]:
+    result: dict[int, list[dict]] = {}
+    for contract in contracts:
+        client_id = _to_int(contract.get("codigoCliente"))
+        if client_id is not None:
+            result.setdefault(client_id, []).append(contract)
+    return result
+
+
 def classify_students(
     clients: list[dict],
     contracts: list[dict],
     plans: list[dict],
-    accesses: list[dict],
+    receivables: list[dict],
     now: datetime,
 ) -> dict:
     if now.tzinfo is None:
         now = now.replace(tzinfo=TIMEZONE)
     else:
         now = now.astimezone(TIMEZONE)
-    window_start = now - timedelta(days=WINDOW_DAYS)
-    contracts_by_client = _active_contracts(contracts, now)
+    active_contracts_by_client = _active_contracts(contracts, now)
+    all_contracts_by_client = _contracts_by_client(contracts)
     plan_names = {
         _to_int(plan.get("id")): str(plan.get("descricao") or "").strip()
         for plan in plans
         if _to_int(plan.get("id")) is not None
     }
-    last_access: dict[int, datetime] = {}
-    recent: set[int] = set()
-    for access in accesses:
-        client_id = _to_int(access.get("CodigoCliente"))
-        accessed_at = _parse_datetime(access.get("Data"))
-        if client_id is None or accessed_at is None or accessed_at > now:
+    overdue_limit = (now - timedelta(days=GRACE_DAYS)).date()
+    overdue_by_client: dict[int, datetime] = {}
+    for receivable in receivables:
+        if _normalized(receivable.get("status")) != "aberto":
             continue
-        if client_id not in last_access or accessed_at > last_access[client_id]:
-            last_access[client_id] = accessed_at
-        if accessed_at >= window_start:
-            recent.add(client_id)
+        client_id = _to_int(receivable.get("codigoCliente"))
+        due_at = _parse_datetime(receivable.get("dataVencimento"))
+        if client_id is None or due_at is None or due_at.date() > overdue_limit:
+            continue
+        if client_id not in overdue_by_client or due_at < overdue_by_client[client_id]:
+            overdue_by_client[client_id] = due_at
 
+    clients_by_id = {
+        client_id: client
+        for client in clients
+        if (client_id := _to_int(client.get("id"))) is not None
+    }
     inactive_students = []
     active_count = 0
-    for client in clients:
-        client_id = _to_int(client.get("id"))
-        if client_id is None or not _is_client_active(client) or client_id not in contracts_by_client:
+    for client_id, client in clients_by_id.items():
+        if not _is_client_active(client) or client_id not in active_contracts_by_client:
             continue
-        if client_id in recent:
+        if client_id not in overdue_by_client:
             active_count += 1
+
+    for client_id, due_at in overdue_by_client.items():
+        client = clients_by_id.get(client_id)
+        if client is None:
             continue
         descriptions = []
-        for contract in contracts_by_client[client_id]:
+        for contract in all_contracts_by_client.get(client_id, []):
             description = plan_names.get(_to_int(contract.get("codigoContratoBase"))) or str(
                 contract.get("descricaoContratoBase") or contract.get("descricaoModalidade") or ""
             ).strip()
             if description and description not in descriptions:
                 descriptions.append(description)
-        last = last_access.get(client_id)
         inactive_students.append({
             "client_id": client_id,
             "name": str(client.get("nome") or "").strip() or "Não informado",
             "plan": "; ".join(descriptions) or "Não informado",
             "phone": format_phone(client.get("dddFone"), client.get("fone")),
-            "last_access": last.isoformat() if last else None,
+            "due_date": due_at.date().isoformat(),
         })
 
     inactive_students.sort(key=lambda student: student["name"].casefold())
     return {
         "updated_at": now.isoformat(),
-        "window_start": window_start.isoformat(),
+        "grace_days": GRACE_DAYS,
         "active_count": active_count,
         "inactive_count": len(inactive_students),
         "inactive_students": inactive_students,
@@ -166,26 +182,26 @@ def _cache_rows(snapshot: dict) -> list[dict]:
     rows = [{
         "Tipo": "META",
         "AtualizadoEm": snapshot["updated_at"],
-        "JanelaInicio": snapshot["window_start"],
+        "DiasTolerancia": snapshot["grace_days"],
         "Ativos": snapshot["active_count"],
         "Inativos": snapshot["inactive_count"],
         "ClienteId": "",
         "Nome": "",
         "Plano": "",
         "Telefone": "",
-        "UltimoAcesso": "",
+        "Vencimento": "",
     }]
     rows.extend({
         "Tipo": "INATIVO",
         "AtualizadoEm": snapshot["updated_at"],
-        "JanelaInicio": snapshot["window_start"],
+        "DiasTolerancia": snapshot["grace_days"],
         "Ativos": snapshot["active_count"],
         "Inativos": snapshot["inactive_count"],
         "ClienteId": student["client_id"],
         "Nome": student["name"],
         "Plano": student["plan"],
         "Telefone": student["phone"],
-        "UltimoAcesso": student["last_access"] or "",
+        "Vencimento": student["due_date"],
     } for student in snapshot["inactive_students"])
     return rows
 
@@ -200,12 +216,12 @@ def read_snapshot() -> dict | None:
         "name": str(row.get("Nome") or "").strip() or "Não informado",
         "plan": str(row.get("Plano") or "").strip() or "Não informado",
         "phone": str(row.get("Telefone") or "").strip() or "Não informado",
-        "last_access": str(row.get("UltimoAcesso") or "").strip() or None,
+        "due_date": str(row.get("Vencimento") or "").strip() or None,
     } for row in rows if str(row.get("Tipo") or "") == "INATIVO"]
     students.sort(key=lambda student: student["name"].casefold())
     return {
         "updated_at": str(meta.get("AtualizadoEm") or ""),
-        "window_start": str(meta.get("JanelaInicio") or ""),
+        "grace_days": int(meta.get("DiasTolerancia") or GRACE_DAYS),
         "active_count": int(meta.get("Ativos") or 0),
         "inactive_count": int(meta.get("Inativos") or 0),
         "inactive_students": students,
@@ -217,28 +233,25 @@ def refresh_snapshot(now: datetime | None = None) -> dict:
         raise RefreshInProgressError("Uma atualização já está em andamento.")
     started = datetime.now(TIMEZONE)
     try:
-        logger.info("Iniciando atualização do dashboard de frequência")
+        logger.info("Iniciando atualização do dashboard de vencimentos")
         client = _nextfit_client()
         sheet = open_nextfit_sync()
         snapshot = classify_students(
             clients=client.clientes(),
             contracts=client.contratos_cliente(),
             plans=client.contratos_base(),
-            accesses=[
-                *sheet.read_tab_all("Presencas"),
-                *sheet.read_tab_all("PresencasManuais"),
-            ],
+            receivables=client.contas_receber(),
             now=now or datetime.now(TIMEZONE),
         )
         sheet.write_tab(CACHE_TAB, _cache_rows(snapshot))
         elapsed = (datetime.now(TIMEZONE) - started).total_seconds()
         logger.info(
-            "Dashboard de frequência atualizado: ativos=%s inativos=%s duração=%.1fs",
+            "Dashboard de vencimentos atualizado: ativos=%s inativos=%s duração=%.1fs",
             snapshot["active_count"], snapshot["inactive_count"], elapsed,
         )
         return snapshot
     except Exception:
-        logger.exception("Falha ao atualizar o dashboard de frequência")
+        logger.exception("Falha ao atualizar o dashboard de vencimentos")
         raise
     finally:
         _refresh_lock.release()

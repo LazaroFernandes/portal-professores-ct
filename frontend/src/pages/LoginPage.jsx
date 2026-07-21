@@ -9,7 +9,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  if (session?.role === "admin") return <Navigate to={location.state?.from || "/frequencia"} replace />;
+  if (session?.role === "admin") return <Navigate to={location.state?.from || "/vencimentos"} replace />;
 
   async function submit(event) {
     event.preventDefault();
@@ -19,11 +19,11 @@ export function LoginPage() {
 
   return <main className="login-page">
     <section className="login-panel">
-      <div className="login-brand"><span>CT</span><div><strong>Ítalo Vieira</strong><small>Controle de frequência</small></div></div>
-      <div className="login-copy"><span className="eyebrow">ACESSO INTERNO</span><h1>Frequência dos alunos.<br />Informação direta.</h1><p>Acompanhe quem acessou a academia nos últimos três dias.</p></div>
+      <div className="login-brand"><span>CT</span><div><strong>Ítalo Vieira</strong><small>Vencimento dos planos</small></div></div>
+      <div className="login-copy"><span className="eyebrow">ACESSO INTERNO</span><h1>Planos e pagamentos.<br />Informação direta.</h1><p>Acompanhe quem está em dia e quem ultrapassou o período de tolerância.</p></div>
     </section>
     <section className="login-form-wrap"><form className="login-form" onSubmit={submit}>
-      <div className="icon-box"><LockKeyhole /></div><h2>Acessar frequência</h2><p>Use a senha administrativa.</p>
+      <div className="icon-box"><LockKeyhole /></div><h2>Acessar vencimentos</h2><p>Use a senha administrativa.</p>
       {location.state?.message && <div className="notice">{location.state.message}</div>}
       {error && <div className="notice error">{error}</div>}
       <label>Senha<input autoFocus type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Digite sua senha" /></label>

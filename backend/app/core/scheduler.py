@@ -34,7 +34,7 @@ def start_scheduler() -> BackgroundScheduler:
         max_instances=1,
     )
     _scheduler.start()
-    logger.info("Agendamento de frequência ativo: diariamente às 05:00 (%s)", TIMEZONE.key)
+    logger.info("Agendamento de vencimentos ativo: diariamente às 05:00 (%s)", TIMEZONE.key)
     return _scheduler
 
 

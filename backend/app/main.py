@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 
@@ -16,8 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import admin, auth, crm, monday, professor, training
+from .api import auth, frequency
 from .core.config import get_settings
+from .core.scheduler import start_scheduler, stop_scheduler
 
 
 logging.basicConfig(
@@ -26,11 +28,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger("nextfit.portal")
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
 app = FastAPI(
     title="Portal CT Ítalo Vieira",
     version="1.0.0",
     docs_url="/api/docs" if not get_settings().production else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 settings = get_settings()
@@ -65,11 +75,7 @@ def health() -> dict:
 
 
 app.include_router(auth.router)
-app.include_router(professor.router)
-app.include_router(admin.router)
-app.include_router(monday.router)
-app.include_router(crm.router)
-app.include_router(training.router)
+app.include_router(frequency.router)
 
 if settings.frontend_dist.exists():
     assets = settings.frontend_dist / "assets"

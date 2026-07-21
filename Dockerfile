@@ -13,7 +13,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend ./backend
 COPY src ./src
-COPY scripts/painel_segunda.py ./scripts/painel_segunda.py
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser

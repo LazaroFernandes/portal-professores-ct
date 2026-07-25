@@ -46,6 +46,32 @@ docker compose up --build
 
 Health check: `GET /api/health`.
 
+## Worker NextFit -> PostgreSQL
+
+O comando abaixo executa uma sincronizacao unica da API publica do NextFit para
+o PostgreSQL configurado em `DATABASE_URL`:
+
+```bash
+python -m nextfit_sync
+```
+
+No Coolify, rode como **Scheduled Task** do recurso/app que usa este Dockerfile
+ou como execucao manual:
+
+```bash
+python -m nextfit_sync
+```
+
+Variaveis necessarias: `DATABASE_URL`, `NEXTFIT_API_KEY`, `NEXTFIT_BASE_URL` e
+`NEXTFIT_API_VERSION`. Na primeira execucao o worker cria as tabelas `nf_*`,
+`sync_runs` e `sync_errors`.
+
+Sugestao de agenda inicial:
+
+```text
+0 6,12,18,22 * * *
+```
+
 ## Render
 
 O `render.yaml` cria um Web Service Docker gratuito. Durante a criacao do

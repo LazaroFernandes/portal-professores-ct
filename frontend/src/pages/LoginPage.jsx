@@ -10,6 +10,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   if (session?.role === "admin") return <Navigate to={location.state?.from || "/vencimentos"} replace />;
+  if (session?.role === "professor") return <Navigate to={location.state?.from || "/registro"} replace />;
 
   async function submit(event) {
     event.preventDefault();

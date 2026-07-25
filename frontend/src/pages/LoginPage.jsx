@@ -23,7 +23,7 @@ export function LoginPage() {
       <div className="login-copy"><span className="eyebrow">ACESSO INTERNO</span><h1>Planos e pagamentos.<br />Informação direta.</h1><p>Acompanhe quem está em dia e quem ultrapassou o período de tolerância.</p></div>
     </section>
     <section className="login-form-wrap"><form className="login-form" onSubmit={submit}>
-      <div className="icon-box"><LockKeyhole /></div><h2>Acessar vencimentos</h2><p>Use a senha administrativa.</p>
+      <div className="icon-box"><LockKeyhole /></div><h2>Acessar portal</h2><p>Use a senha administrativa ou individual do professor.</p>
       {location.state?.message && <div className="notice">{location.state.message}</div>}
       {error && <div className="notice error">{error}</div>}
       <label>Senha<input autoFocus type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Digite sua senha" /></label>

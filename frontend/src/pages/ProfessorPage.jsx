@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Save, UserRound } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, LogOut, Save, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { query, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -48,7 +48,7 @@ function StudentCard({ student, start, professor, onSaved }) {
 }
 
 export function ProfessorPage() {
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
   const [start, setStart] = useState(isoWeek());
   const [professor, setProfessor] = useState("");
   const [filter, setFilter] = useState("all");
@@ -68,7 +68,7 @@ export function ProfessorPage() {
   if (loading && !data) return <Page><Loading label="Carregando seus alunos…" /></Page>;
   if (error && !data) return <Page><ErrorState error={error} retry={load} /></Page>;
   return <Page>
-    <div className="page-heading"><div><span className="eyebrow">ACOMPANHAMENTO</span><h1>Registro semanal</h1><p>Atualize frequência, desempenho e observações da carteira.</p></div><div className="heading-icon"><UserRound /></div></div>
+    <div className="page-heading"><div><span className="eyebrow">ACOMPANHAMENTO</span><h1>Registro semanal</h1><p>Atualize frequência, desempenho e observações da carteira.</p></div><div className="heading-actions"><div className="heading-icon"><UserRound /></div><button className="button logout-button" onClick={logout}><LogOut size={17} />Sair</button></div></div>
     {session.role === "admin" && <label className="inline-select">Professor<select value={professor} onChange={(event) => setProfessor(event.target.value)}>{data?.professors.map((name) => <option key={name}>{name}</option>)}</select></label>}
     <div className="week-picker"><button onClick={() => setStart(shiftWeek(start, -1))}><ChevronLeft /></button><div><strong>{data?.label}</strong><span>{data?.start} a {data?.end}</span></div><button onClick={() => setStart(shiftWeek(start, 1))}><ChevronRight /></button></div>
     {!data?.opened ? <div className="action-card"><strong>Esta semana ainda não foi aberta</strong><p>Crie os registros dos alunos ativos para começar o preenchimento.</p><button className="button primary" onClick={openWeek}>Abrir esta semana</button></div> : <>

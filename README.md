@@ -72,6 +72,31 @@ Sugestao de agenda inicial:
 0 6,12,18,22 * * *
 ```
 
+## Importar Google Sheets -> PostgreSQL
+
+Importa todas as abas da planilha principal `GOOGLE_SHEET_ID` e da planilha
+`CONTROLE_PROFESSORES_SHEET_ID` para tabelas `sheet_nextfit_*` e
+`sheet_controle_*`:
+
+```bash
+python -m sheets_to_postgres
+```
+
+Este comando preserva cada linha como `payload JSONB`, sem apagar as planilhas.
+
+## Worker NextFit V2 -> PostgreSQL
+
+Sincroniza dados da API interna V2 quando `NEXTFIT_V2_TOKEN`,
+`NEXTFIT_V2_REFRESH_TOKEN` e `NEXTFIT_CODIGO_UNIDADE` estiverem configurados:
+
+```bash
+python -m nextfit_v2_sync --endpoint presencas
+python -m nextfit_v2_sync --endpoint treinos
+```
+
+Se o token V2 estiver expirado, o comando registra erro em `sync_errors` e para
+sem afetar o sync da API publica.
+
 ## Render
 
 O `render.yaml` cria um Web Service Docker gratuito. Durante a criacao do

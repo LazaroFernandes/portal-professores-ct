@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime
 from time import perf_counter
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
 from nextfit_client import NextFitClient
+from postgres_store import (
+    connect,
+    create_raw_table,
+    create_run_tables,
+    finish_run,
+    record_error,
+    record_key,
+    start_run,
+    upsert_raw_records,
+)
 
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
-TIMEZONE = ZoneInfo("America/Sao_Paulo")
 logger = logging.getLogger("nextfit.sync")
 
 
@@ -43,17 +49,8 @@ ENDPOINTS: tuple[Endpoint, ...] = (
 )
 
 
-def _now() -> datetime:
-    return datetime.now(TIMEZONE)
-
-
 def _record_key(record: dict[str, Any], key_fields: tuple[str, ...]) -> str:
-    for field in key_fields:
-        value = record.get(field)
-        if value not in (None, ""):
-            return str(value)
-    body = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return "sha256:" + hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return record_key(record, key_fields)
 
 
 def _client_from_env() -> NextFitClient:
@@ -69,120 +66,29 @@ def _client_from_env() -> NextFitClient:
 
 
 def _connect():
-    database_url = os.environ.get("DATABASE_URL", "").strip()
-    if not database_url:
-        raise RuntimeError("DATABASE_URL nao configurada.")
-    import psycopg
-
-    return psycopg.connect(database_url)
+    return connect()
 
 
 def _create_schema(conn) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS sync_runs (
-                id BIGSERIAL PRIMARY KEY,
-                started_at TIMESTAMPTZ NOT NULL,
-                finished_at TIMESTAMPTZ,
-                status TEXT NOT NULL,
-                source TEXT NOT NULL,
-                details JSONB NOT NULL DEFAULT '{}'::jsonb
-            )
-            """
-        )
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS sync_errors (
-                id BIGSERIAL PRIMARY KEY,
-                run_id BIGINT REFERENCES sync_runs(id) ON DELETE SET NULL,
-                endpoint TEXT NOT NULL,
-                message TEXT NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            )
-            """
-        )
-        for endpoint in ENDPOINTS:
-            cur.execute(
-                f"""
-                CREATE TABLE IF NOT EXISTS {endpoint.table} (
-                    external_id TEXT PRIMARY KEY,
-                    payload JSONB NOT NULL,
-                    fetched_at TIMESTAMPTZ NOT NULL,
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-                )
-                """
-            )
-            cur.execute(
-                f"CREATE INDEX IF NOT EXISTS {endpoint.table}_payload_gin ON {endpoint.table} USING GIN (payload)"
-            )
-    conn.commit()
+    create_run_tables(conn)
+    for endpoint in ENDPOINTS:
+        create_raw_table(conn, endpoint.table)
 
 
 def _start_run(conn) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO sync_runs (started_at, status, source, details)
-            VALUES (%s, %s, %s, %s::jsonb)
-            RETURNING id
-            """,
-            (_now(), "running", "nextfit-public-api", "{}"),
-        )
-        row = cur.fetchone()
-    conn.commit()
-    return int(row[0])
+    return start_run(conn, "nextfit-public-api")
 
 
 def _finish_run(conn, run_id: int, status: str, details: dict[str, Any]) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE sync_runs
-            SET finished_at = %s, status = %s, details = %s::jsonb
-            WHERE id = %s
-            """,
-            (_now(), status, json.dumps(details, ensure_ascii=False), run_id),
-        )
-    conn.commit()
+    finish_run(conn, run_id, status, details)
 
 
 def _record_error(conn, run_id: int, endpoint: str, exc: Exception) -> None:
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO sync_errors (run_id, endpoint, message)
-            VALUES (%s, %s, %s)
-            """,
-            (run_id, endpoint, str(exc)[:2000]),
-        )
-    conn.commit()
+    record_error(conn, run_id, endpoint, exc)
 
 
 def _upsert_records(conn, endpoint: Endpoint, records: list[dict[str, Any]]) -> int:
-    if not records:
-        return 0
-    from psycopg.types.json import Jsonb
-
-    fetched_at = _now()
-    rows = [
-        (_record_key(record, endpoint.key_fields), Jsonb(record), fetched_at)
-        for record in records
-    ]
-    with conn.cursor() as cur:
-        cur.executemany(
-            f"""
-            INSERT INTO {endpoint.table} (external_id, payload, fetched_at, updated_at)
-            VALUES (%s, %s, %s, now())
-            ON CONFLICT (external_id) DO UPDATE
-            SET payload = EXCLUDED.payload,
-                fetched_at = EXCLUDED.fetched_at,
-                updated_at = now()
-            """,
-            rows,
-        )
-    conn.commit()
-    return len(rows)
+    return upsert_raw_records(conn, endpoint.table, records, endpoint.key_fields)
 
 
 def sync_once(selected: set[str] | None = None) -> dict[str, Any]:

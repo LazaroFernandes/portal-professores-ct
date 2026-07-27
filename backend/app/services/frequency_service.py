@@ -8,6 +8,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from controle_professores import postgres_data
 from controle_professores.client import load_env, open_nextfit_sync
 from nextfit_client import NextFitClient
 
@@ -207,6 +208,8 @@ def _cache_rows(snapshot: dict) -> list[dict]:
 
 
 def read_snapshot() -> dict | None:
+    if postgres_data.enabled():
+        return _snapshot_from_postgres()
     rows = open_nextfit_sync().read_tab_all(CACHE_TAB)
     meta = next((row for row in rows if str(row.get("Tipo") or "") == "META"), None)
     if not meta:
@@ -234,6 +237,16 @@ def refresh_snapshot(now: datetime | None = None) -> dict:
     started = datetime.now(TIMEZONE)
     try:
         logger.info("Iniciando atualização do dashboard de vencimentos")
+        if postgres_data.enabled():
+            snapshot = _snapshot_from_postgres(now=now)
+            if snapshot is None:
+                raise RuntimeError("Dados do NextFit ainda nao encontrados no PostgreSQL.")
+            elapsed = (datetime.now(TIMEZONE) - started).total_seconds()
+            logger.info(
+                "Dashboard de vencimentos lido do PostgreSQL: ativos=%s inativos=%s duracao=%.1fs",
+                snapshot["active_count"], snapshot["inactive_count"], elapsed,
+            )
+            return snapshot
         client = _nextfit_client()
         sheet = open_nextfit_sync()
         snapshot = classify_students(
@@ -255,3 +268,19 @@ def refresh_snapshot(now: datetime | None = None) -> dict:
         raise
     finally:
         _refresh_lock.release()
+
+
+def _snapshot_from_postgres(now: datetime | None = None) -> dict | None:
+    clients = postgres_data.read_raw_table("nf_clientes")
+    contracts = postgres_data.read_raw_table("nf_contratos_cliente")
+    plans = postgres_data.read_raw_table("nf_contratos_base")
+    receivables = postgres_data.read_raw_table("nf_contas_receber")
+    if not clients or not contracts:
+        return None
+    return classify_students(
+        clients=clients,
+        contracts=contracts,
+        plans=plans,
+        receivables=receivables,
+        now=now or datetime.now(TIMEZONE),
+    )

@@ -6,6 +6,7 @@ from controle_professores.abrir_semana import abrir_semana
 from controle_professores.alunos import set_turno
 from controle_professores.client import open_controle
 from controle_professores.config import TAB_ALUNOS, TAB_REGISTRO
+from controle_professores import postgres_data
 from controle_professores.registro import upsert_em_lote
 from controle_professores.semana import fmt_iso, label_semana, parse_iso, semana_atual
 
@@ -13,10 +14,14 @@ from ..core.cache import cache
 
 
 def _alunos() -> list[dict]:
+    if postgres_data.enabled():
+        return cache.get_or_set("controle:alunos:postgres", 120, postgres_data.read_alunos)
     return cache.get_or_set("controle:alunos", 120, lambda: open_controle().read_tab_all(TAB_ALUNOS))
 
 
 def _registros() -> list[dict]:
+    if postgres_data.enabled():
+        return cache.get_or_set("controle:registros:postgres", 120, postgres_data.read_registros)
     return cache.get_or_set("controle:registros", 120, lambda: open_controle().read_tab_all(TAB_REGISTRO))
 
 
@@ -114,8 +119,12 @@ def open_week(user: dict, requested_professor: str | None, start_raw: str) -> di
     start = parse_iso(start_raw)
     if not start:
         raise ValueError("Data inicial inválida")
-    active, created = abrir_semana(start, professor_filtro=professor)
-    cache.invalidate("controle:registros")
+    if postgres_data.enabled():
+        active, created = postgres_data.open_week(start, professor_filtro=professor)
+        cache.invalidate("controle:registros:postgres")
+    else:
+        active, created = abrir_semana(start, professor_filtro=professor)
+        cache.invalidate("controle:registros")
     return {"active": active, "created": created}
 
 
@@ -134,7 +143,7 @@ def update_student(
     if not student:
         raise PermissionError("Aluno não pertence à carteira do professor")
     end = start + timedelta(days=6)
-    upsert_em_lote([{
+    weekly_row = {
         "ClienteId": client_id,
         "Nome": str(student.get("Nome") or ""),
         "Professor": professor,
@@ -143,10 +152,14 @@ def update_student(
         "Frequencia": data.frequencia,
         "Desempenho": data.desempenho,
         "Relato": data.relato,
-    }])
+    }
+    if postgres_data.enabled():
+        postgres_data.upsert_registros([weekly_row])
+    else:
+        upsert_em_lote([weekly_row])
     shift_status = "unchanged"
     current_shift = str(student.get("Turno") or "").strip().upper()
     if data.turno != current_shift:
-        shift_status = set_turno(client_id, data.turno)
-    cache.invalidate("controle:alunos", "controle:registros")
+        shift_status = postgres_data.set_turno(client_id, data.turno) if postgres_data.enabled() else set_turno(client_id, data.turno)
+    cache.invalidate("controle:alunos", "controle:registros", "controle:alunos:postgres", "controle:registros:postgres")
     return {"saved": True, "shift_status": shift_status}

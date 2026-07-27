@@ -38,7 +38,7 @@ class V2Endpoint:
 
 ENDPOINTS: tuple[V2Endpoint, ...] = (
     V2Endpoint("presencas", "nf_v2_presencas", ("Id", "id", "Codigo", "codigo")),
-    V2Endpoint("treinos", "nf_v2_treinos", ("TreinoId", "Id", "id")),
+    V2Endpoint("treinos", "nf_v2_treinos", ("__row_key",)),
 )
 
 
@@ -93,8 +93,26 @@ def _fetch(endpoint: V2Endpoint, public_client: NextFitClient, v2_client: NextFi
         data_inicial, data_final = _resolve_presencas_window()
         return v2_client.presencas(data_inicial, data_final)
     if endpoint.name == "treinos":
-        return v2_client.treinos_completos(clientes_ativos=_active_clients(public_client))
+        return _add_treino_row_keys(v2_client.treinos_completos(clientes_ativos=_active_clients(public_client)))
     raise RuntimeError(f"Endpoint v2 desconhecido: {endpoint.name}")
+
+
+def _add_treino_row_keys(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Gera uma chave por linha achatada de treino.
+
+    A V2 retorna uma linha por exercício, mas várias linhas compartilham o mesmo
+    TreinoId. Usar só o TreinoId como chave faz o upsert manter apenas uma linha
+    por treino. Esta chave representa a granularidade real da tabela.
+    """
+    keyed: list[dict[str, Any]] = []
+    for record in records:
+        row = dict(record)
+        row["__row_key"] = "|".join(
+            str(row.get(field) or "")
+            for field in ("CodigoCliente", "TreinoId", "Sessao", "OrdemExercicio", "Exercicio")
+        )
+        keyed.append(row)
+    return keyed
 
 
 def sync_once(selected: set[str] | None = None) -> dict[str, Any]:

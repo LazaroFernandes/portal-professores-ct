@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, RefreshCw, Search, Users, UserX } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, LogOut, RefreshCw, Search, Users, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -11,6 +11,7 @@ const updatedAt = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 const dueDate = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
+const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
 
 function filterStudents(students, search) {
   const term = search.trim().toLocaleLowerCase("pt-BR");
@@ -20,6 +21,44 @@ function filterStudents(students, search) {
     student.name.toLocaleLowerCase("pt-BR").includes(term)
     || (digits && student.phone.replace(/\D/g, "").includes(digits))
   ));
+}
+
+function sortStudents(students, sort) {
+  return [...students].sort((left, right) => {
+    const leftValue = left[sort.key];
+    const rightValue = right[sort.key];
+    const leftMissing = leftValue === null || leftValue === undefined || leftValue === "";
+    const rightMissing = rightValue === null || rightValue === undefined || rightValue === "";
+
+    if (leftMissing || rightMissing) {
+      if (leftMissing && rightMissing) return collator.compare(left.name || "", right.name || "");
+      return leftMissing ? 1 : -1;
+    }
+
+    const comparison = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : collator.compare(String(leftValue), String(rightValue));
+    return comparison === 0
+      ? collator.compare(left.name || "", right.name || "")
+      : comparison * (sort.direction === "asc" ? 1 : -1);
+  });
+}
+
+function SortHeader({ label, sortKey, sort, onSort }) {
+  const active = sort.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
+  return <th aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+    <button
+      type="button"
+      className={`sort-button${active ? " active" : ""}`}
+      onClick={() => onSort({
+        key: sortKey,
+        direction: active && sort.direction === "asc" ? "desc" : "asc",
+      })}
+    >
+      {label} <Icon size={14} />
+    </button>
+  </th>;
 }
 
 function formatDate(value) {
@@ -49,6 +88,8 @@ export function FrequencyPage() {
   const [showPending, setShowPending] = useState(false);
   const [activeSearch, setActiveSearch] = useState("");
   const [pendingSearch, setPendingSearch] = useState("");
+  const [activeSort, setActiveSort] = useState({ key: "days_until_due", direction: "asc" });
+  const [pendingSort, setPendingSort] = useState({ key: "days_overdue", direction: "desc" });
 
   function load() {
     setError(null);
@@ -72,12 +113,12 @@ export function FrequencyPage() {
   const activeStudents = payload?.snapshot?.active_students || [];
   const pendingStudents = payload?.snapshot?.inactive_students || [];
   const filteredActive = useMemo(
-    () => filterStudents(activeStudents, activeSearch),
-    [activeSearch, activeStudents],
+    () => sortStudents(filterStudents(activeStudents, activeSearch), activeSort),
+    [activeSearch, activeSort, activeStudents],
   );
   const filteredPending = useMemo(
-    () => filterStudents(pendingStudents, pendingSearch),
-    [pendingSearch, pendingStudents],
+    () => sortStudents(filterStudents(pendingStudents, pendingSearch), pendingSort),
+    [pendingSearch, pendingSort, pendingStudents],
   );
 
   if (!payload && !error) return <div className="page frequency-page"><Loading /></div>;
@@ -144,7 +185,13 @@ export function FrequencyPage() {
           </label>
           {!filteredActive.length ? <div className="empty-inline">Nenhum aluno encontrado para esta pesquisa.</div> :
             <div className="table-scroll frequency-table"><table>
-              <thead><tr><th>NOME</th><th>PLANO ATUAL</th><th>VENCIMENTO / RENOVAÇÃO</th><th>PRAZO</th><th>TELEFONE</th></tr></thead>
+              <thead><tr>
+                <SortHeader label="NOME" sortKey="name" sort={activeSort} onSort={setActiveSort} />
+                <SortHeader label="PLANO ATUAL" sortKey="plan" sort={activeSort} onSort={setActiveSort} />
+                <SortHeader label="VENCIMENTO / RENOVAÇÃO" sortKey="due_date" sort={activeSort} onSort={setActiveSort} />
+                <SortHeader label="PRAZO" sortKey="days_until_due" sort={activeSort} onSort={setActiveSort} />
+                <SortHeader label="TELEFONE" sortKey="phone" sort={activeSort} onSort={setActiveSort} />
+              </tr></thead>
               <tbody>{filteredActive.map((student) => <tr key={student.client_id}>
                 <td data-label="Nome">{student.name || "Não informado"}</td>
                 <td data-label="Plano atual">{student.plan || "Não informado"}</td>
@@ -172,7 +219,14 @@ export function FrequencyPage() {
           </label>
           {!filteredPending.length ? <div className="empty-inline">Nenhum aluno encontrado para esta pesquisa.</div> :
             <div className="table-scroll frequency-table"><table>
-              <thead><tr><th>NOME</th><th>PLANO ATUAL</th><th>VENCIMENTO</th><th>MOTIVO</th><th>ATRASO</th><th>TELEFONE</th></tr></thead>
+              <thead><tr>
+                <SortHeader label="NOME" sortKey="name" sort={pendingSort} onSort={setPendingSort} />
+                <SortHeader label="PLANO ATUAL" sortKey="plan" sort={pendingSort} onSort={setPendingSort} />
+                <SortHeader label="VENCIMENTO" sortKey="due_date" sort={pendingSort} onSort={setPendingSort} />
+                <SortHeader label="MOTIVO" sortKey="reason" sort={pendingSort} onSort={setPendingSort} />
+                <SortHeader label="ATRASO" sortKey="days_overdue" sort={pendingSort} onSort={setPendingSort} />
+                <SortHeader label="TELEFONE" sortKey="phone" sort={pendingSort} onSort={setPendingSort} />
+              </tr></thead>
               <tbody>{filteredPending.map((student) => <tr key={student.client_id}>
                 <td data-label="Nome">{student.name || "Não informado"}</td>
                 <td data-label="Plano atual">{student.plan || "Não informado"}</td>

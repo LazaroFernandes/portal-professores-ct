@@ -5,8 +5,30 @@ segunda e evolucao de treinos.
 
 - Backend: FastAPI e Python.
 - Frontend: React e Vite.
-- Persistencia: Google Sheets.
-- Producao: Docker no Render Free.
+- Persistencia principal: PostgreSQL na VPS/Coolify.
+- Google Sheets: legado/importacao temporaria durante a migracao.
+- Producao atual: Docker no Coolify/Hostinger VPS.
+- Render: legado; `render.yaml` foi mantido apenas como referencia.
+
+## Estado atual da producao
+
+A producao atual roda no Coolify em `professores.ctitalovieira.com.br`.
+As telas principais ja usam PostgreSQL quando `DATABASE_URL` esta configurada:
+
+- `/registro`: le/escreve `portal_alunos` e `portal_registro_semanal`.
+- `/vencimentos`: le as tabelas `nf_*` alimentadas pela VPS.
+
+Scheduled Tasks ativas no Coolify:
+
+```text
+nextfit-sync        -> API publica NextFit para nf_*
+nextfit-v2-sync     -> API V2 NextFit para nf_v2_*
+portal-alunos-sync  -> nf_* para portal_alunos
+```
+
+Ainda existem partes legadas que podem consultar Google Sheets, especialmente
+rotinas antigas/admin nao priorizadas e importacoes temporarias. Nao remova as
+credenciais Google ate a migracao dessas partes ser concluida.
 
 ## Desenvolvimento local
 
@@ -72,6 +94,22 @@ Sugestao de agenda inicial:
 0 6,12,18,22 * * *
 ```
 
+## Worker portal_alunos -> PostgreSQL
+
+Atualiza a tabela `portal_alunos` a partir das tabelas `nf_clientes`,
+`nf_usuarios`, `nf_contratos_cliente` e `nf_contratos_base`, preservando ajustes
+manuais ja existentes no portal, como `Turno` e `Professor`:
+
+```bash
+python -m sync_portal_alunos
+```
+
+No Coolify, rode como Scheduled Task alguns minutos depois do `nextfit-sync`:
+
+```text
+10 6,12,18,22 * * *
+```
+
 ## Importar Google Sheets -> PostgreSQL
 
 Importa todas as abas da planilha principal `GOOGLE_SHEET_ID` e da planilha
@@ -99,8 +137,13 @@ sem afetar o sync da API publica.
 
 ## Render
 
-O `render.yaml` cria um Web Service Docker gratuito. Durante a criacao do
-Blueprint, preencha somente no Render as variaveis marcadas como secretas.
+O `render.yaml` e legado. A producao atual nao roda no Render; roda no
+Coolify/Hostinger VPS.
+
+Se o Render for usado novamente em algum teste, sera obrigatorio configurar
+`DATABASE_URL` e as demais variaveis secretas no painel do Render. Sem
+`DATABASE_URL`, o app ativa o fallback legado para Google Sheets em partes que
+ainda mantem compatibilidade de transicao.
 
 Depois do primeiro deploy, adicione `professores.ctitalovieira.com.br` em
 **Settings > Custom Domains** e configure o CNAME indicado no DNS da Hostinger.

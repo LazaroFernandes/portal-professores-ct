@@ -1,5 +1,10 @@
 # Auditoria e plano de migração do Streamlit
 
+> Nota de status (2026-07-29): este documento e uma auditoria historica da
+> migracao inicial. A producao atual roda em Coolify/Hostinger VPS com
+> PostgreSQL como persistencia principal. Google Sheets permanece como legado e
+> fonte temporaria de importacao para partes ainda nao migradas.
+
 Data da auditoria: 20/07/2026
 
 ## 1. Diagnóstico atual

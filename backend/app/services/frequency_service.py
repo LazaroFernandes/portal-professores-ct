@@ -11,12 +11,19 @@ from zoneinfo import ZoneInfo
 from controle_professores import postgres_data
 from controle_professores.client import load_env, open_nextfit_sync
 from nextfit_client import NextFitClient
+from nextfit_sync import sync_once as sync_nextfit_to_postgres
 
 
 logger = logging.getLogger("nextfit.frequency")
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
 CACHE_TAB = "DashboardVencimentos"
 GRACE_DAYS = 3
+POSTGRES_SYNC_ENDPOINTS = {
+    "clientes",
+    "contratos_base",
+    "contratos_cliente",
+    "contas_receber",
+}
 _refresh_lock = threading.Lock()
 
 
@@ -259,12 +266,15 @@ def refresh_snapshot(now: datetime | None = None) -> dict:
     try:
         logger.info("Iniciando atualização do dashboard de vencimentos")
         if postgres_data.enabled():
+            sync_result = sync_nextfit_to_postgres(selected=POSTGRES_SYNC_ENDPOINTS)
+            if sync_result.get("errors"):
+                raise RuntimeError("Sincronização do NextFit com PostgreSQL falhou.")
             snapshot = _snapshot_from_postgres(now=now)
             if snapshot is None:
                 raise RuntimeError("Dados do NextFit ainda nao encontrados no PostgreSQL.")
             elapsed = (datetime.now(TIMEZONE) - started).total_seconds()
             logger.info(
-                "Dashboard de vencimentos lido do PostgreSQL: ativos=%s inativos=%s duracao=%.1fs",
+                "Dashboard de vencimentos sincronizado no PostgreSQL: ativos=%s inativos=%s duracao=%.1fs",
                 snapshot["active_count"], snapshot["inactive_count"], elapsed,
             )
             return snapshot

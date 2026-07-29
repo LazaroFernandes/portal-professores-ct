@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from backend.app.services.frequency_service import classify_students, format_phone
+from backend.app.services.frequency_service import classify_students, format_phone, refresh_snapshot
 
 
 TZ = ZoneInfo("America/Sao_Paulo")
@@ -135,6 +136,28 @@ class FrequencyServiceTests(unittest.TestCase):
         self.assertEqual(format_phone("48", "33334444"), "(48) 3333-4444")
         self.assertEqual(format_phone("", ""), "Não informado")
         self.assertEqual(format_phone("51", "1234567"), "Não informado")
+
+    @patch(
+        "backend.app.services.frequency_service._snapshot_from_postgres",
+        return_value={"active_count": 10, "inactive_count": 2},
+    )
+    @patch(
+        "backend.app.services.frequency_service.sync_nextfit_to_postgres",
+        return_value={"errors": 0},
+    )
+    @patch("backend.app.services.frequency_service.postgres_data.enabled", return_value=True)
+    def test_refresh_syncs_nextfit_before_reading_postgres(
+        self, _enabled, sync_nextfit, _snapshot
+    ) -> None:
+        result = refresh_snapshot(now=datetime(2026, 7, 21, 5, 0, tzinfo=TZ))
+
+        self.assertEqual(result["inactive_count"], 2)
+        sync_nextfit.assert_called_once_with(selected={
+            "clientes",
+            "contratos_base",
+            "contratos_cliente",
+            "contas_receber",
+        })
 
 
 if __name__ == "__main__":

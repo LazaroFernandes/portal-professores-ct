@@ -182,6 +182,29 @@ def read_alunos() -> list[dict[str, Any]]:
             return [dict(row["payload"] or {}) for row in cur.fetchall()]
 
 
+def replace_portal_alunos(rows: list[dict[str, Any]]) -> int:
+    with _connect() as conn:
+        _ensure_portal_tables(conn)
+        with conn.cursor() as cur:
+            for row in rows:
+                try:
+                    cliente_id = int(row.get("ClienteId"))
+                except (TypeError, ValueError):
+                    continue
+                cur.execute(
+                    """
+                    INSERT INTO portal_alunos (cliente_id, payload, updated_at)
+                    VALUES (%s, %s, now())
+                    ON CONFLICT (cliente_id) DO UPDATE
+                    SET payload = EXCLUDED.payload,
+                        updated_at = now()
+                    """,
+                    (cliente_id, _jsonb({header: row.get(header, "") for header in HEADERS_ALUNOS})),
+                )
+        conn.commit()
+    return len(rows)
+
+
 def read_registros() -> list[dict[str, Any]]:
     with _connect() as conn:
         _ensure_portal_tables(conn)

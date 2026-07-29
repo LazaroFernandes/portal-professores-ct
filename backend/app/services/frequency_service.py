@@ -85,6 +85,17 @@ def _contracts_by_client(contracts: list[dict]) -> dict[int, list[dict]]:
     return result
 
 
+def _contract_sort_key(contract: dict) -> tuple[float, int]:
+    started_at = (
+        _parse_datetime(contract.get("dataInicio"))
+        or _parse_datetime(contract.get("dataCriacao"))
+    )
+    return (
+        started_at.timestamp() if started_at else float("-inf"),
+        _to_int(contract.get("id")) or -1,
+    )
+
+
 def classify_students(
     clients: list[dict],
     contracts: list[dict],
@@ -114,6 +125,16 @@ def classify_students(
             continue
         if client_id not in overdue_by_client or due_at < overdue_by_client[client_id]:
             overdue_by_client[client_id] = due_at
+
+    for client_id, client_contracts in all_contracts_by_client.items():
+        latest_contract = max(client_contracts, key=_contract_sort_key)
+        if _normalized(latest_contract.get("status")) != "bloqueado":
+            continue
+        expires_at = _parse_datetime(latest_contract.get("dataValidade"))
+        if expires_at is None or expires_at.date() > overdue_limit:
+            continue
+        if client_id not in overdue_by_client or expires_at < overdue_by_client[client_id]:
+            overdue_by_client[client_id] = expires_at
 
     clients_by_id = {
         client_id: client

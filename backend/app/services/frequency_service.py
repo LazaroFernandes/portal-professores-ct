@@ -103,6 +103,18 @@ def _contract_sort_key(contract: dict) -> tuple[float, int]:
     )
 
 
+def _plan_description(contract: dict, plan_names: dict[int | None, str]) -> str:
+    return (
+        plan_names.get(_to_int(contract.get("codigoContratoBase")))
+        or str(
+            contract.get("descricaoContratoBase")
+            or contract.get("descricaoModalidade")
+            or ""
+        ).strip()
+        or "Não informado"
+    )
+
+
 def classify_students(
     clients: list[dict],
     contracts: list[dict],
@@ -116,13 +128,20 @@ def classify_students(
         now = now.astimezone(TIMEZONE)
     active_contracts_by_client = _active_contracts(contracts, now)
     all_contracts_by_client = _contracts_by_client(contracts)
+    current_contract_by_client = {
+        client_id: max(
+            active_contracts_by_client.get(client_id) or client_contracts,
+            key=_contract_sort_key,
+        )
+        for client_id, client_contracts in all_contracts_by_client.items()
+    }
     plan_names = {
         _to_int(plan.get("id")): str(plan.get("descricao") or "").strip()
         for plan in plans
         if _to_int(plan.get("id")) is not None
     }
     overdue_limit = (now - timedelta(days=GRACE_DAYS)).date()
-    overdue_by_client: dict[int, datetime] = {}
+    overdue_receivable_by_client: dict[int, datetime] = {}
     for receivable in receivables:
         if _normalized(receivable.get("status")) != "aberto":
             continue
@@ -130,58 +149,70 @@ def classify_students(
         due_at = _parse_datetime(receivable.get("dataVencimento"))
         if client_id is None or due_at is None or due_at.date() > overdue_limit:
             continue
-        if client_id not in overdue_by_client or due_at < overdue_by_client[client_id]:
-            overdue_by_client[client_id] = due_at
-
-    for client_id, client_contracts in all_contracts_by_client.items():
-        latest_contract = max(client_contracts, key=_contract_sort_key)
-        if _normalized(latest_contract.get("status")) != "bloqueado":
-            continue
-        expires_at = _parse_datetime(latest_contract.get("dataValidade"))
-        if expires_at is None or expires_at.date() > overdue_limit:
-            continue
-        if client_id not in overdue_by_client or expires_at < overdue_by_client[client_id]:
-            overdue_by_client[client_id] = expires_at
+        current_due = overdue_receivable_by_client.get(client_id)
+        if current_due is None or due_at < current_due:
+            overdue_receivable_by_client[client_id] = due_at
 
     clients_by_id = {
         client_id: client
         for client in clients
         if (client_id := _to_int(client.get("id"))) is not None
     }
-    inactive_students = []
-    active_count = 0
+    active_students = []
+    pending_students = []
     for client_id, client in clients_by_id.items():
-        if not _is_client_active(client) or client_id not in active_contracts_by_client:
+        current_contract = current_contract_by_client.get(client_id)
+        if current_contract is None or not _is_client_active(client):
             continue
-        if client_id not in overdue_by_client:
-            active_count += 1
+        contract_status = _normalized(current_contract.get("status"))
+        if contract_status not in {"ativo", "bloqueado"}:
+            continue
+        ended_at = _parse_datetime(current_contract.get("dataEncerramento"))
+        if ended_at and ended_at <= now:
+            continue
 
-    for client_id, due_at in overdue_by_client.items():
-        client = clients_by_id.get(client_id)
-        if client is None:
-            continue
-        descriptions = []
-        for contract in all_contracts_by_client.get(client_id, []):
-            description = plan_names.get(_to_int(contract.get("codigoContratoBase"))) or str(
-                contract.get("descricaoContratoBase") or contract.get("descricaoModalidade") or ""
-            ).strip()
-            if description and description not in descriptions:
-                descriptions.append(description)
-        inactive_students.append({
+        contract_due = _parse_datetime(current_contract.get("dataValidade"))
+        contract_overdue = bool(contract_due and contract_due.date() <= overdue_limit)
+        receivable_due = overdue_receivable_by_client.get(client_id)
+        reasons = []
+        if receivable_due:
+            reasons.append("Pagamento vencido")
+        if contract_overdue and contract_status == "bloqueado":
+            reasons.append("Plano bloqueado")
+        elif contract_overdue:
+            reasons.append("Plano vencido")
+
+        base = {
             "client_id": client_id,
             "name": str(client.get("nome") or "").strip() or "Não informado",
-            "plan": "; ".join(descriptions) or "Não informado",
+            "plan": _plan_description(current_contract, plan_names),
             "phone": format_phone(client.get("dddFone"), client.get("fone")),
-            "due_date": due_at.date().isoformat(),
-        })
+        }
+        if reasons:
+            due_candidates = [date for date in (receivable_due, contract_due) if date]
+            due_at = min(due_candidates)
+            pending_students.append({
+                **base,
+                "due_date": due_at.date().isoformat(),
+                "reason": " e ".join(reason.lower() if index else reason for index, reason in enumerate(reasons)),
+                "days_overdue": (now.date() - due_at.date()).days,
+            })
+        elif contract_status == "ativo":
+            active_students.append({
+                **base,
+                "due_date": contract_due.date().isoformat() if contract_due else None,
+                "days_until_due": (contract_due.date() - now.date()).days if contract_due else None,
+            })
 
-    inactive_students.sort(key=lambda student: student["name"].casefold())
+    active_students.sort(key=lambda student: student["name"].casefold())
+    pending_students.sort(key=lambda student: student["name"].casefold())
     return {
         "updated_at": now.isoformat(),
         "grace_days": GRACE_DAYS,
-        "active_count": active_count,
-        "inactive_count": len(inactive_students),
-        "inactive_students": inactive_students,
+        "active_count": len(active_students),
+        "inactive_count": len(pending_students),
+        "active_students": active_students,
+        "inactive_students": pending_students,
     }
 
 
@@ -219,9 +250,11 @@ def _cache_rows(snapshot: dict) -> list[dict]:
         "Plano": "",
         "Telefone": "",
         "Vencimento": "",
+        "Motivo": "",
+        "Dias": "",
     }]
     rows.extend({
-        "Tipo": "INATIVO",
+        "Tipo": "PENDENTE",
         "AtualizadoEm": snapshot["updated_at"],
         "DiasTolerancia": snapshot["grace_days"],
         "Ativos": snapshot["active_count"],
@@ -231,7 +264,23 @@ def _cache_rows(snapshot: dict) -> list[dict]:
         "Plano": student["plan"],
         "Telefone": student["phone"],
         "Vencimento": student["due_date"],
+        "Motivo": student["reason"],
+        "Dias": student["days_overdue"],
     } for student in snapshot["inactive_students"])
+    rows.extend({
+        "Tipo": "EM_DIA",
+        "AtualizadoEm": snapshot["updated_at"],
+        "DiasTolerancia": snapshot["grace_days"],
+        "Ativos": snapshot["active_count"],
+        "Inativos": snapshot["inactive_count"],
+        "ClienteId": student["client_id"],
+        "Nome": student["name"],
+        "Plano": student["plan"],
+        "Telefone": student["phone"],
+        "Vencimento": student["due_date"] or "",
+        "Motivo": "",
+        "Dias": student["days_until_due"] if student["days_until_due"] is not None else "",
+    } for student in snapshot["active_students"])
     return rows
 
 
@@ -242,20 +291,32 @@ def read_snapshot() -> dict | None:
     meta = next((row for row in rows if str(row.get("Tipo") or "") == "META"), None)
     if not meta:
         return None
-    students = [{
+    pending_students = [{
         "client_id": _to_int(row.get("ClienteId")),
         "name": str(row.get("Nome") or "").strip() or "Não informado",
         "plan": str(row.get("Plano") or "").strip() or "Não informado",
         "phone": str(row.get("Telefone") or "").strip() or "Não informado",
         "due_date": str(row.get("Vencimento") or "").strip() or None,
-    } for row in rows if str(row.get("Tipo") or "") == "INATIVO"]
-    students.sort(key=lambda student: student["name"].casefold())
+        "reason": str(row.get("Motivo") or "").strip() or "Pendência identificada",
+        "days_overdue": _to_int(row.get("Dias")),
+    } for row in rows if str(row.get("Tipo") or "") in {"PENDENTE", "INATIVO"}]
+    active_students = [{
+        "client_id": _to_int(row.get("ClienteId")),
+        "name": str(row.get("Nome") or "").strip() or "Não informado",
+        "plan": str(row.get("Plano") or "").strip() or "Não informado",
+        "phone": str(row.get("Telefone") or "").strip() or "Não informado",
+        "due_date": str(row.get("Vencimento") or "").strip() or None,
+        "days_until_due": _to_int(row.get("Dias")),
+    } for row in rows if str(row.get("Tipo") or "") == "EM_DIA"]
+    pending_students.sort(key=lambda student: student["name"].casefold())
+    active_students.sort(key=lambda student: student["name"].casefold())
     return {
         "updated_at": str(meta.get("AtualizadoEm") or ""),
         "grace_days": int(meta.get("DiasTolerancia") or GRACE_DAYS),
         "active_count": int(meta.get("Ativos") or 0),
         "inactive_count": int(meta.get("Inativos") or 0),
-        "inactive_students": students,
+        "active_students": active_students,
+        "inactive_students": pending_students,
     }
 
 

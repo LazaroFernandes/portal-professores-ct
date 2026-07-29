@@ -40,6 +40,9 @@ class FrequencyServiceTests(unittest.TestCase):
         self.assertEqual(result["inactive_students"][0]["name"], "Bruno")
         self.assertEqual(result["inactive_students"][0]["plan"], "Plano Black")
         self.assertEqual(result["inactive_students"][0]["due_date"], "2026-07-18")
+        self.assertEqual(result["inactive_students"][0]["reason"], "Pagamento vencido")
+        self.assertEqual(result["inactive_students"][0]["days_overdue"], 3)
+        self.assertEqual(result["active_students"][0]["name"], "Ana")
 
     def test_keeps_open_payment_in_three_day_grace_period_active(self) -> None:
         now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
@@ -65,6 +68,7 @@ class FrequencyServiceTests(unittest.TestCase):
         self.assertEqual(result["active_count"], 0)
         self.assertEqual(result["inactive_count"], 1)
         self.assertEqual(result["inactive_students"][0]["plan"], "Plano Black")
+        self.assertEqual(result["inactive_students"][0]["reason"], "Pagamento vencido")
 
     def test_lists_latest_blocked_contract_three_days_after_expiration(self) -> None:
         now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
@@ -85,6 +89,7 @@ class FrequencyServiceTests(unittest.TestCase):
         self.assertEqual(result["active_count"], 0)
         self.assertEqual(result["inactive_count"], 1)
         self.assertEqual(result["inactive_students"][0]["due_date"], "2026-07-18")
+        self.assertEqual(result["inactive_students"][0]["reason"], "Plano bloqueado")
 
     def test_keeps_recently_expired_blocked_contract_in_grace_period(self) -> None:
         now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
@@ -103,6 +108,92 @@ class FrequencyServiceTests(unittest.TestCase):
         )
         self.assertEqual(result["active_count"], 0)
         self.assertEqual(result["inactive_count"], 0)
+
+    def test_uses_only_latest_contract_for_status_and_plan(self) -> None:
+        now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
+        result = classify_students(
+            [{"id": 1, "nome": "Ana", "inativo": False}],
+            [
+                {
+                    "id": 10,
+                    "codigoCliente": 1,
+                    "codigoContratoBase": 10,
+                    "status": "Bloqueado",
+                    "dataInicio": "2025-01-01",
+                    "dataValidade": "2025-02-01",
+                },
+                {
+                    "id": 20,
+                    "codigoCliente": 1,
+                    "codigoContratoBase": 20,
+                    "status": "Ativo",
+                    "dataInicio": "2026-07-01",
+                    "dataValidade": "2026-08-01",
+                },
+            ],
+            [
+                {"id": 10, "descricao": "Plano antigo"},
+                {"id": 20, "descricao": "Plano atual"},
+            ],
+            [],
+            now,
+        )
+        self.assertEqual(result["active_count"], 1)
+        self.assertEqual(result["inactive_count"], 0)
+        self.assertEqual(result["active_students"][0]["plan"], "Plano atual")
+        self.assertEqual(result["active_students"][0]["due_date"], "2026-08-01")
+        self.assertEqual(result["active_students"][0]["days_until_due"], 11)
+
+    def test_excludes_open_debt_when_latest_contract_is_ended(self) -> None:
+        now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
+        result = classify_students(
+            [{"id": 1, "nome": "Ana", "inativo": False}],
+            [{
+                "id": 20,
+                "codigoCliente": 1,
+                "status": "Encerrado",
+                "dataInicio": "2026-01-01",
+                "dataValidade": "2026-07-01",
+            }],
+            [],
+            [{"codigoCliente": 1, "status": "Aberto", "dataVencimento": "2026-06-01"}],
+            now,
+        )
+        self.assertEqual(result["active_count"], 0)
+        self.assertEqual(result["inactive_count"], 0)
+
+    def test_keeps_current_active_contract_when_newer_add_on_has_ended(self) -> None:
+        now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)
+        result = classify_students(
+            [{"id": 1, "nome": "Ana", "inativo": False}],
+            [
+                {
+                    "id": 10,
+                    "codigoCliente": 1,
+                    "codigoContratoBase": 10,
+                    "status": "Ativo",
+                    "dataInicio": "2026-01-01",
+                    "dataValidade": "2026-12-31",
+                },
+                {
+                    "id": 20,
+                    "codigoCliente": 1,
+                    "codigoContratoBase": 20,
+                    "status": "Encerrado",
+                    "dataInicio": "2026-07-01",
+                    "dataValidade": "2026-07-10",
+                },
+            ],
+            [
+                {"id": 10, "descricao": "Plano principal"},
+                {"id": 20, "descricao": "Adicional encerrado"},
+            ],
+            [],
+            now,
+        )
+        self.assertEqual(result["active_count"], 1)
+        self.assertEqual(result["inactive_count"], 0)
+        self.assertEqual(result["active_students"][0]["plan"], "Plano principal")
 
     def test_ignores_non_open_receivables(self) -> None:
         now = datetime(2026, 7, 21, 5, 0, tzinfo=TZ)

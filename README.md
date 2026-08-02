@@ -24,6 +24,7 @@ Scheduled Tasks ativas no Coolify:
 nextfit-sync        -> API publica NextFit para nf_*
 nextfit-v2-sync     -> API V2 NextFit para nf_v2_*
 portal-alunos-sync  -> nf_* para portal_alunos
+birthday-report     -> relatorio diario de aniversariantes elegiveis
 ```
 
 Ainda existem partes legadas que podem consultar Google Sheets, especialmente
@@ -108,6 +109,28 @@ No Coolify, rode como Scheduled Task alguns minutos depois do `nextfit-sync`:
 
 ```text
 10 6,12,18,22 * * *
+```
+
+## Relatorio diario de aniversariantes
+
+Lista os aniversariantes elegiveis do dia usando `nf_clientes` e
+`nf_contratos_cliente` ja sincronizados no PostgreSQL. Elegivel = cliente ativo
+ou contrato vencido ha no maximo 3 dias.
+
+```bash
+python -m aniversariantes_do_dia
+```
+
+Para testar uma data especifica:
+
+```bash
+python -m aniversariantes_do_dia --date 2026-08-01
+```
+
+No Coolify, rode como Scheduled Task diaria depois do `nextfit-sync` da manha:
+
+```text
+30 6 * * *
 ```
 
 ## Importar Google Sheets -> PostgreSQL

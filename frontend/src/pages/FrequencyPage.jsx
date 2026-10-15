@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorState, Loading } from "../components/AsyncState";
+import { AdminNav } from "../components/AdminNav";
 
 
 const updatedAt = new Intl.DateTimeFormat("pt-BR", {
@@ -121,10 +122,11 @@ export function FrequencyPage() {
     [pendingSearch, pendingSort, pendingStudents],
   );
 
-  if (!payload && !error) return <div className="page frequency-page"><Loading /></div>;
+  if (!payload && !error) return <div className="page frequency-page"><AdminNav /><Loading /></div>;
 
   const snapshot = payload?.snapshot;
   return <div className="page frequency-page">
+    <AdminNav />
     <div className="page-heading frequency-heading">
       <div>
         <span className="eyebrow">PLANOS</span>

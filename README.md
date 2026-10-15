@@ -17,6 +17,15 @@ As telas principais ja usam PostgreSQL quando `DATABASE_URL` esta configurada:
 
 - `/registro`: le/escreve `portal_alunos` e `portal_registro_semanal`.
 - `/vencimentos`: le as tabelas `nf_*` alimentadas pela VPS.
+- `/admin/professores`: análise administrativa da carteira ativa por semana, com
+  totais e percentuais de preenchimento, registros completos/parciais/em branco,
+  filtros por professor, situação e pesquisa, e consulta às semanas registradas.
+  O endpoint `GET /api/admin/professors/analysis?start=AAAA-MM-DD` exige perfil
+  administrativo e faz apenas leitura (inclusive no PostgreSQL, sem criar tabelas).
+  Semanas anteriores usam a carteira ativa **atual**; o professor armazenado no
+  registro é exibido quando difere do responsável atual. Frequência zero conta
+  como preenchida; um registro completo exige frequência, desempenho e relato.
+  Preenchimento não comprova contato realizado. A consulta não sincroniza alunos.
 
 Scheduled Tasks ativas no Coolify:
 

@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import auth, frequency, professor
+from .api import auth, frequency, professor, professor_analysis
 from .core.config import get_settings
 from .core.scheduler import start_scheduler, stop_scheduler
 
@@ -77,6 +77,7 @@ def health() -> dict:
 app.include_router(auth.router)
 app.include_router(frequency.router)
 app.include_router(professor.router)
+app.include_router(professor_analysis.router)
 
 if settings.frontend_dist.exists():
     assets = settings.frontend_dist / "assets"

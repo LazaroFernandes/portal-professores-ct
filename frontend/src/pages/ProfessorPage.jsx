@@ -4,6 +4,8 @@ import { query, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Empty, ErrorState, Loading } from "../components/AsyncState";
 import { Kpi, KpiGrid } from "../components/Kpi";
+import { AdminNav } from "../components/AdminNav";
+import { useSearchParams } from "react-router-dom";
 
 const performances = ["", "Muito bom", "Bom", "Regular", "Não está vindo", "Férias"];
 const shifts = ["", "MANHÃ", "TARDE", "NOITE"];
@@ -49,8 +51,9 @@ function StudentCard({ student, start, professor, onSaved }) {
 
 export function ProfessorPage() {
   const { session, logout } = useAuth();
-  const [start, setStart] = useState(isoWeek());
-  const [professor, setProfessor] = useState("");
+  const [params] = useSearchParams();
+  const [start, setStart] = useState(params.get("start") || isoWeek());
+  const [professor, setProfessor] = useState(session.role === "admin" ? params.get("professor") || "" : "");
   const [filter, setFilter] = useState("all");
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -79,4 +82,4 @@ export function ProfessorPage() {
   </Page>;
 }
 
-function Page({ children }) { return <div className="page narrow">{children}</div>; }
+function Page({ children }) { return <div className="page narrow"><AdminNav />{children}</div>; }

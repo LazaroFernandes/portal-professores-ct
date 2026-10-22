@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request, status
 
 from .config import get_settings
+from ..services.nextfit_roster import canonical_professor
 
 
 COOKIE_NAME = "nextfit_portal_session"
@@ -50,10 +51,10 @@ def authenticate(password: str) -> dict[str, str] | None:
         return {"role": "admin", "name": "Administrador"}
     for name, encoded in settings.professor_password_hashes.items():
         if verify_password(password, encoded):
-            return {"role": "professor", "name": name}
+            return {"role": "professor", "name": canonical_professor(name)} if canonical_professor(name) else None
     for name, configured in settings.professor_passwords.items():
         if configured and secrets.compare_digest(password, configured):
-            return {"role": "professor", "name": name}
+            return {"role": "professor", "name": canonical_professor(name)} if canonical_professor(name) else None
     return None
 
 
@@ -96,6 +97,11 @@ def current_user(request: Request) -> dict[str, Any]:
     user = read_session(request.cookies.get(COOKIE_NAME))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão expirada")
+    if user.get("role") == "professor":
+        name = canonical_professor(user.get("name"))
+        if not name:
+            raise HTTPException(status_code=403, detail="Professor fora da equipe ativa")
+        user = {**user, "name": name}
     return user
 
 

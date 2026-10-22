@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import auth, frequency, professor, professor_analysis
+from .api import auth, frequency, professor, professor_analysis, presence
 from .core.config import get_settings
 from .core.scheduler import start_scheduler, stop_scheduler
 
@@ -74,6 +74,7 @@ def health() -> dict:
     return {"status": "ok", "service": "nextfit-portal"}
 
 
+app.include_router(presence.router)
 app.include_router(auth.router)
 app.include_router(frequency.router)
 app.include_router(professor.router)

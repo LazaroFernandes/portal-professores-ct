@@ -83,15 +83,16 @@ class ProfessorAnalysisTests(unittest.TestCase):
     @patch.object(service.postgres_data, "enabled", return_value=True)
     @patch.object(service.postgres_data, "_table_exists", return_value=True)
     @patch.object(service.postgres_data, "_connect")
-    def test_postgres_reader_is_read_only_and_never_seeds(self, connect, _exists, _enabled):
+    @patch.object(service, "current_roster", return_value={"students": [STUDENTS[0]]})
+    def test_postgres_reader_is_read_only_and_never_seeds(self, _roster, connect, _exists, _enabled):
         cursor = connect.return_value.__enter__.return_value.cursor.return_value.__enter__.return_value
-        cursor.fetchall.side_effect = [[{"payload": STUDENTS[0]}], [{"payload": RECORDS[0]}]]
+        cursor.fetchall.side_effect = [[{"payload": RECORDS[0]}]]
         with patch.object(service.postgres_data, "_ensure_portal_tables") as ensure:
             students, records, source = service.read_source()
         ensure.assert_not_called()
         self.assertEqual(students, [STUDENTS[0]])
         self.assertEqual(records, [RECORDS[0]])
-        self.assertEqual(source, "PostgreSQL")
+        self.assertEqual(source, "API NextFit + registros PostgreSQL")
         statements = [call.args[0] for call in cursor.execute.call_args_list]
         self.assertIn("READ ONLY", statements[0])
         self.assertTrue(all(sql.startswith(("SELECT", "SET TRANSACTION")) for sql in statements))
@@ -99,17 +100,19 @@ class ProfessorAnalysisTests(unittest.TestCase):
     @patch.object(service.postgres_data, "enabled", return_value=True)
     @patch.object(service.postgres_data, "_table_exists", return_value=False)
     @patch.object(service.postgres_data, "_connect", return_value=MagicMock())
+    @patch.object(service, "current_roster", return_value={"students": STUDENTS})
     def test_missing_postgres_tables_are_not_reported_as_zero(self, *_):
         with self.assertRaises(RuntimeError):
             service.read_source()
 
     @patch.object(service.postgres_data, "enabled", return_value=False)
     @patch.object(service, "open_controle")
-    def test_sheets_source_is_read_only(self, open_sheet, _enabled):
-        open_sheet.return_value.read_tab_all.side_effect = [STUDENTS, RECORDS]
+    @patch.object(service, "current_roster", return_value={"students": STUDENTS})
+    def test_sheets_source_is_read_only(self, _roster, open_sheet, _enabled):
+        open_sheet.return_value.read_tab_all.side_effect = [RECORDS]
         students, records, source = service.read_source()
-        self.assertEqual((students, records, source), (STUDENTS, RECORDS, "Google Sheets"))
-        self.assertEqual([call[0] for call in open_sheet.return_value.mock_calls], ["read_tab_all", "read_tab_all"])
+        self.assertEqual((students, records, source), (STUDENTS, RECORDS, "API NextFit + registros Google Sheets"))
+        self.assertEqual([call[0] for call in open_sheet.return_value.mock_calls], ["read_tab_all"])
 
 
 class AnalysisAccessTests(unittest.TestCase):

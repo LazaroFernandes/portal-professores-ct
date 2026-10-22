@@ -36,7 +36,7 @@ from controle_professores.semana import (  # noqa: E402
 )
 
 
-def abrir_semana(inicio: date | None = None, professor_filtro: str | None = None) -> tuple[int, int]:
+def abrir_semana(inicio: date | None = None, professor_filtro: str | None = None, alunos_source: list[dict] | None = None) -> tuple[int, int]:
     """Abre a semana inserindo linhas vazias pros alunos ativos.
 
     Retorna (qtd_alunos_ativos, qtd_linhas_inseridas).
@@ -48,7 +48,7 @@ def abrir_semana(inicio: date | None = None, professor_filtro: str | None = None
         ini, fim = semana_de(inicio)
 
     sc = open_controle()
-    alunos = sc.read_tab_all(TAB_ALUNOS)
+    alunos = sc.read_tab_all(TAB_ALUNOS) if alunos_source is None else alunos_source
     ativos = [a for a in alunos if str(a.get("Status") or "").strip().upper() == "ATIVO"]
     if professor_filtro:
         ativos = [a for a in ativos if str(a.get("Professor") or "").strip() == professor_filtro]

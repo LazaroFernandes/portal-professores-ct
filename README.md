@@ -15,13 +15,13 @@ segunda e evolucao de treinos.
 A producao atual roda no Coolify em `professores.ctitalovieira.com.br`.
 As telas principais ja usam PostgreSQL quando `DATABASE_URL` esta configurada:
 
-- `/registro`: le/escreve `portal_alunos` e `portal_registro_semanal`.
+- `/registro`: consulta a carteira na API NextFit; os registros preenchidos ficam em `portal_registro_semanal`.
 - `/vencimentos`: le as tabelas `nf_*` alimentadas pela VPS.
 - `/admin/professores`: análise administrativa da carteira ativa por semana, com
   totais e percentuais de preenchimento, registros completos/parciais/em branco,
   filtros por professor, situação e pesquisa, e consulta às semanas registradas.
   O endpoint `GET /api/admin/professors/analysis?start=AAAA-MM-DD` exige perfil
-  administrativo e faz apenas leitura (inclusive no PostgreSQL, sem criar tabelas).
+  administrativo e consulta a carteira NextFit e os registros PostgreSQL somente leitura.
   Semanas anteriores usam a carteira ativa **atual**; o professor armazenado no
   registro é exibido quando difere do responsável atual. Frequência zero conta
   como preenchida; um registro completo exige frequência, desempenho e relato.
@@ -193,3 +193,48 @@ pnpm build
 
 O diagnostico completo da migracao esta em
 [`docs/migracao-streamlit-auditoria.md`](docs/migracao-streamlit-auditoria.md).
+
+## Operação diária
+
+`/academia` mostra acessos do dia, carteira do professor, ficha/sessão e confirmação
+manual de atendimento. `/pendencias` reúne atendimentos anteriores não finalizados.
+Administradores veem todos; professores veem apenas a carteira vinculada às visitas.
+Há um atendimento por aluno por dia; novas passagens no mesmo dia não reabrem um registro finalizado.
+A tela atualiza acessos a cada 15 segundos e treinos a cada 30 segundos enquanto aberta.
+Acesso registrado e conclusão de treino **não comprovam presença física nem saída**.
+
+Com `DATABASE_URL`, a persistência usa as três tabelas aditivas `portal_gym_visits`,
+`portal_gym_presence_state` e `portal_daily_attendance_records`. A migração idempotente
+está em `backend/migrations/001_daily_operation.sql`; não altera registros semanais.
+SQLite existe apenas como fallback de desenvolvimento; produção exige PostgreSQL.
+O SQLite do protótipo não é importado automaticamente.
+
+A consulta de acessos/treinos usa a API V2 configurada no servidor. Tokens precisam
+estar válidos; falhas aparecem na tela com a última atualização bem-sucedida.
+O cliente mantém tokens renovados em memória; a configuração do ambiente precisa
+continuar válida após reinicializações. Nenhuma nova tarefa agendada é instalada.
+A confirmação do atendimento exige a sessão e o CSRF existentes, grava no portal
+sem alterar o NextFit e pode ser reaberta para edição.
+
+Publicação: preservar backup do PostgreSQL e imagem anterior; publicar a imagem do
+commit revisado; validar `/api/health`, acesso anônimo 401, perfis administrativo e
+professor, sincronização, formulário e releitura. Rollback usa a imagem anterior e
+preserva as novas tabelas e registros (não desfazer migração com DROP).
+
+### Fonte direta NextFit e equipe ativa (22/10/2026)
+
+A carteira de alunos e o responsável vêm de `Pessoa/GetClientes`,
+`Pessoa/GetUsuarios` e `ContratoCliente` da API pública, com cache de 120 segundos.
+O vínculo é pelo ID do professor, não pelo autor da ficha nem pelo nome da planilha.
+A equipe autorizada tem sete IDs verificados em `services/nextfit_roster.py`.
+Professores fora da equipe não autenticam nem mantêm acesso com sessão anterior.
+O alias legado de Lucas Fiorio é normalizado sem alterar a senha existente.
+
+Operação diária, carteira semanal e análise administrativa usam essa fonte para
+cadastros e vínculo. Registros preenchidos continuam no armazenamento do portal;
+turnos manuais legados são preservados como metadado local, sem substituir vínculos
+NextFit. A prévia sem PostgreSQL mantém apenas os registros semanais legados no Sheets.
+Não há fallback silencioso de responsável: falha na API impede acesso à carteira.
+Mudanças de responsável passam a valer após expirar o cache de até 120 segundos.
+Alunos sem um dos sete professores ficam sem vínculo; nenhum cadastro é alterado
+no NextFit. Esta mudança é de leitura da API.

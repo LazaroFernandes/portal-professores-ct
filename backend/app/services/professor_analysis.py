@@ -8,28 +8,28 @@ from zoneinfo import ZoneInfo
 from controle_professores import postgres_data
 from controle_professores.client import open_controle
 from controle_professores.config import TAB_ALUNOS, TAB_REGISTRO
+from .nextfit_roster import current_roster
 
 
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 
 def read_source() -> tuple[list[dict], list[dict], str]:
+    students = current_roster()["students"]
     if not postgres_data.enabled():
         sheet = open_controle()
-        return sheet.read_tab_all(TAB_ALUNOS), sheet.read_tab_all(TAB_REGISTRO), "Google Sheets"
+        return students, sheet.read_tab_all(TAB_REGISTRO), "API NextFit + registros Google Sheets"
     # Unlike the legacy readers, analytics must never create or seed tables.
     with postgres_data._connect() as conn:
         with conn.cursor() as cur:
             cur.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
             if not all(postgres_data._table_exists(conn, table) for table in (
-                "portal_alunos", "portal_registro_semanal",
+                "portal_registro_semanal",
             )):
                 raise RuntimeError("Base de acompanhamento ainda não disponível")
-            cur.execute("SELECT payload FROM portal_alunos ORDER BY cliente_id")
-            students = [dict(row["payload"] or {}) for row in cur.fetchall()]
             cur.execute("SELECT payload FROM portal_registro_semanal ORDER BY semana_inicio, cliente_id")
             records = [dict(row["payload"] or {}) for row in cur.fetchall()]
-    return students, records, "PostgreSQL"
+    return students, records, "API NextFit + registros PostgreSQL"
 
 
 def _text(value) -> str:

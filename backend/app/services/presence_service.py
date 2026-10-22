@@ -220,6 +220,11 @@ class PresenceStore:
             ).fetchall()
         return self._serialize_visits(rows, now)
 
+    def client_for_visit(self, visit_id):
+        with closing(self._connect()) as connection:
+            row = self._execute(connection, "SELECT client_id FROM portal_gym_visits WHERE id = ?", (visit_id,)).fetchone()
+        return str(row["client_id"]) if row else None
+
     def professor_for_visit(self, visit_id: int) -> str | None:
         with closing(self._connect()) as connection:
             row = self._execute(connection, 
@@ -533,12 +538,10 @@ def refresh_if_due(now: datetime | None = None) -> None:
 
 
 def refresh_student_context(store: PresenceStore, now: datetime) -> None:
-    """Relaciona as visitas do dia à carteira manual já usada pelo portal."""
-    from . import professor_service
-
+    """Relaciona visitas à carteira atual consultada diretamente no NextFit."""
     students = {
         str(row.get("ClienteId") or "").strip(): row
-        for row in professor_service._alunos()
+        for row in _roster_students()
         if str(row.get("ClienteId") or "").strip()
     }
     for visit in store.training_targets(now):
@@ -554,7 +557,7 @@ def refresh_student_context(store: PresenceStore, now: datetime) -> None:
                 visit["id"],
                 "",
                 "",
-                "Aluno não localizado na carteira do Portal dos Professores.",
+                "Aluno não localizado na consulta atual do NextFit.",
             )
 
 
@@ -665,7 +668,9 @@ def _visit_allowed(visit_id: int, user: dict, now: datetime | None = None) -> bo
     if user.get("role") == "admin":
         return True
     professor = str(user.get("name") or "").strip().casefold()
-    owner = _store().professor_for_visit(visit_id)
+    cid = _store().client_for_visit(visit_id)
+    owner = next((str(row.get("Professor") or "") for row in _roster_students()
+                  if str(row["ClienteId"]) == cid), None)
     return owner is not None and owner.strip().casefold() == professor
 
 
@@ -708,20 +713,30 @@ def refresh_training_if_due(now: datetime | None = None) -> None:
         _training_refresh_lock.release()
 
 
+def _roster_students():
+    from .nextfit_roster import current_roster
+    return current_roster()["students"]
+
+
+def _with_current_professors(visits):
+    roster = {str(row["ClienteId"]): row for row in _roster_students()}
+    return [{**visit, "professor": roster.get(visit["client_id"], {}).get("Professor", ""),
+             "shift": roster.get(visit["client_id"], {}).get("Turno", "")} for visit in visits]
+
+
 def current_payload(now: datetime | None = None, user: dict | None = None) -> dict:
     now = now or datetime.now(TIMEZONE)
     refresh_if_due(now)
     refresh_training_if_due(now)
-    visits = _store().active(now, include_finished=True)
+    visits = _with_current_professors(_store().active(now, include_finished=True))
     if user and user.get("role") == "professor":
         professor = str(user.get("name") or "").strip().casefold()
         visits = [
             visit for visit in visits
             if visit["professor"].strip().casefold() == professor
         ]
-    professors = sorted({
-        visit["professor"] for visit in visits if visit["professor"]
-    })
+    from .nextfit_roster import professor_names
+    professors = professor_names() if not user or user.get("role") == "admin" else [user["name"]]
     return {
         "last_access_sync": _store().state("last_poll"),
         "updated_at": now.isoformat(),
@@ -736,14 +751,15 @@ def current_payload(now: datetime | None = None, user: dict | None = None) -> di
 
 def pending_payload(now: datetime | None = None, user: dict | None = None) -> dict:
     now = now or datetime.now(TIMEZONE)
-    visits = _store().pending_before(now)
+    visits = _with_current_professors(_store().pending_before(now))
     if user and user.get("role") == "professor":
         professor = str(user.get("name") or "").strip().casefold()
         visits = [
             visit for visit in visits
             if visit["professor"].strip().casefold() == professor
         ]
-    professors = sorted({visit["professor"] for visit in visits if visit["professor"]})
+    from .nextfit_roster import professor_names
+    professors = professor_names() if not user or user.get("role") == "admin" else [user["name"]]
     return {
         "last_access_sync": _store().state("last_poll"),
         "updated_at": now.isoformat(),

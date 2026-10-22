@@ -15,13 +15,13 @@ segunda e evolucao de treinos.
 A producao atual roda no Coolify em `professores.ctitalovieira.com.br`.
 As telas principais ja usam PostgreSQL quando `DATABASE_URL` esta configurada:
 
-- `/registro`: le/escreve `portal_alunos` e `portal_registro_semanal`.
+- `/registro`: consulta a carteira na API NextFit; os registros preenchidos ficam em `portal_registro_semanal`.
 - `/vencimentos`: le as tabelas `nf_*` alimentadas pela VPS.
 - `/admin/professores`: análise administrativa da carteira ativa por semana, com
   totais e percentuais de preenchimento, registros completos/parciais/em branco,
   filtros por professor, situação e pesquisa, e consulta às semanas registradas.
   O endpoint `GET /api/admin/professors/analysis?start=AAAA-MM-DD` exige perfil
-  administrativo e faz apenas leitura (inclusive no PostgreSQL, sem criar tabelas).
+  administrativo e consulta a carteira NextFit e os registros PostgreSQL somente leitura.
   Semanas anteriores usam a carteira ativa **atual**; o professor armazenado no
   registro é exibido quando difere do responsável atual. Frequência zero conta
   como preenchida; um registro completo exige frequência, desempenho e relato.
@@ -220,3 +220,21 @@ Publicação: preservar backup do PostgreSQL e imagem anterior; publicar a image
 commit revisado; validar `/api/health`, acesso anônimo 401, perfis administrativo e
 professor, sincronização, formulário e releitura. Rollback usa a imagem anterior e
 preserva as novas tabelas e registros (não desfazer migração com DROP).
+
+### Fonte direta NextFit e equipe ativa (22/10/2026)
+
+A carteira de alunos e o responsável vêm de `Pessoa/GetClientes`,
+`Pessoa/GetUsuarios` e `ContratoCliente` da API pública, com cache de 120 segundos.
+O vínculo é pelo ID do professor, não pelo autor da ficha nem pelo nome da planilha.
+A equipe autorizada tem sete IDs verificados em `services/nextfit_roster.py`.
+Professores fora da equipe não autenticam nem mantêm acesso com sessão anterior.
+O alias legado de Lucas Fiorio é normalizado sem alterar a senha existente.
+
+Operação diária, carteira semanal e análise administrativa usam essa fonte para
+cadastros e vínculo. Registros preenchidos continuam no armazenamento do portal;
+turnos manuais legados são preservados como metadado local, sem substituir vínculos
+NextFit. A prévia sem PostgreSQL mantém apenas os registros semanais legados no Sheets.
+Não há fallback silencioso de responsável: falha na API impede acesso à carteira.
+Mudanças de responsável passam a valer após expirar o cache de até 120 segundos.
+Alunos sem um dos sete professores ficam sem vínculo; nenhum cadastro é alterado
+no NextFit. Esta mudança é de leitura da API.

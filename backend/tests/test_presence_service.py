@@ -20,6 +20,9 @@ TZ = ZoneInfo("America/Sao_Paulo")
 
 class PresenceStoreTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.roster_patch = patch("backend.app.services.presence_service._roster_students", return_value=[{"ClienteId": 10, "Professor": "Lucas"}])
+        self.roster_patch.start()
+        self.addCleanup(self.roster_patch.stop)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.store = PresenceStore(Path(self.temp_dir.name) / "presence.db")
 

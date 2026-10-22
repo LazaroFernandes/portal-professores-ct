@@ -22,7 +22,7 @@ class PresenceAccessTests(unittest.TestCase):
         self.app = FastAPI()
         self.app.include_router(router)
         self.client = TestClient(self.app)
-        self.patches = [patch.object(service, '_store', return_value=self.store),
+        self.patches = [patch.object(service, '_roster_students', return_value=[{'ClienteId': n, 'Professor': f'Professor {n}'} for n in (1, 2)]), patch.object(service, '_store', return_value=self.store),
                         patch.object(service, 'refresh_if_due'), patch.object(service, 'refresh_training_if_due')]
         for item in self.patches: item.start()
 

@@ -10,12 +10,18 @@ router = APIRouter(prefix="/api/presence", tags=["presence"])
 
 @router.get("")
 def current_presence(user: dict = Depends(current_user)) -> dict:
-    return presence_service.current_payload(user=user)
+    try:
+        return presence_service.current_payload(user=user)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível consultar a carteira atual no NextFit.") from exc
 
 
 @router.get("/pending")
 def pending_presence(user: dict = Depends(current_user)) -> dict:
-    return presence_service.pending_payload(user=user)
+    try:
+        return presence_service.pending_payload(user=user)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível consultar a carteira atual no NextFit.") from exc
 
 
 @router.get("/{visit_id}/training")

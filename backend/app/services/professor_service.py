@@ -14,9 +14,17 @@ from ..core.cache import cache
 
 
 def _alunos() -> list[dict]:
-    if postgres_data.enabled():
-        return cache.get_or_set("controle:alunos:postgres", 120, postgres_data.read_alunos)
-    return cache.get_or_set("controle:alunos", 120, lambda: open_controle().read_tab_all(TAB_ALUNOS))
+    from .nextfit_roster import current_roster
+    students = current_roster()["students"]
+    # Preserve only the locally managed shift, never the legacy teacher assignment.
+    try:
+        rows = (cache.get_or_set("controle:alunos:postgres", 120, postgres_data.read_alunos)
+                if postgres_data.enabled() else cache.get_or_set("controle:alunos", 120,
+                    lambda: open_controle().read_tab_all(TAB_ALUNOS)))
+        shifts = {str(row.get("ClienteId")): str(row.get("Turno") or "") for row in rows}
+    except Exception:
+        shifts = {}
+    return [{**row, "Turno": shifts.get(str(row["ClienteId"]), "")} for row in students]
 
 
 def _registros() -> list[dict]:
@@ -26,12 +34,8 @@ def _registros() -> list[dict]:
 
 
 def professores_disponiveis() -> list[str]:
-    return sorted({
-        str(row.get("Professor") or "").strip()
-        for row in _alunos()
-        if str(row.get("Status") or "").strip().upper() == "ATIVO"
-        and str(row.get("Professor") or "").strip()
-    })
+    from .nextfit_roster import professor_names
+    return professor_names()
 
 
 def resolve_professor(user: dict, requested: str | None) -> str:
@@ -120,10 +124,10 @@ def open_week(user: dict, requested_professor: str | None, start_raw: str) -> di
     if not start:
         raise ValueError("Data inicial inválida")
     if postgres_data.enabled():
-        active, created = postgres_data.open_week(start, professor_filtro=professor)
+        active, created = postgres_data.open_week(start, professor_filtro=professor, alunos_source=_alunos())
         cache.invalidate("controle:registros:postgres")
     else:
-        active, created = abrir_semana(start, professor_filtro=professor)
+        active, created = abrir_semana(start, professor_filtro=professor, alunos_source=_alunos())
         cache.invalidate("controle:registros")
     return {"active": active, "created": created}
 

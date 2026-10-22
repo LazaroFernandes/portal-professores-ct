@@ -231,9 +231,9 @@ def set_turno(cliente_id: int, turno: str) -> str:
     return "updated" if updated else "not_found"
 
 
-def open_week(inicio: date, professor_filtro: str | None = None) -> tuple[int, int]:
+def open_week(inicio: date, professor_filtro: str | None = None, alunos_source: list[dict] | None = None) -> tuple[int, int]:
     ini, fim = semana_de(inicio)
-    alunos = read_alunos()
+    alunos = read_alunos() if alunos_source is None else alunos_source
     ativos = [row for row in alunos if str(row.get("Status") or "").strip().upper() == "ATIVO"]
     if professor_filtro:
         ativos = [row for row in ativos if str(row.get("Professor") or "").strip() == professor_filtro]

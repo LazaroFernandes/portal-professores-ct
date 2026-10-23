@@ -10,21 +10,21 @@ const labels = { pending: 'Sem registro', registered: 'Registrado', not_observed
 export function today() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
 function dateLabel(value) { return value ? value.slice(0,10).split('-').reverse().join('/') : 'Sem prazo'; }
 function failure(e) { return typeof e.message === 'string' && !e.message.includes('[object Object]') ? e.message : 'Confira os campos obrigatórios antes de salvar.'; }
-function useData(path, params) {
+export function useData(path, params) {
   const [data,setData]=useState(null), [error,setError]=useState(''), [loading,setLoading]=useState(true), [revision,setRevision]=useState(0);
   const key=JSON.stringify(params || {});
   useEffect(()=> { let active=true; setLoading(true); setError(''); query(path,JSON.parse(key)).then(d=>{if(active)setData(d);}).catch(e=>{if(active){setError(failure(e));setData(null);}}).finally(()=>{if(active)setLoading(false);}); return ()=>{active=false;}; },[path,key,revision]);
   return {data,error,loading,reload:()=>setRevision(v=>v+1)};
 }
-function Shell({title,subtitle,children}) {
+export function Shell({title,subtitle,children}) {
   const {session,logout}=useAuth(); const {data}=useData('/api/daily/preview-info');
   return <main className="dw page">{data?.enabled && <div className="dw-demo">PRÉVIA LOCAL · Dados fictícios · Nenhuma alteração no NextFit ou no portal publicado</div>}<header className="dw-header"><div><span className="eyebrow">CT ÍTALO VIEIRA · PORTAL DA EQUIPE</span><h1>{title}</h1><p>{subtitle}</p></div><div className="dw-user"><span>{session.name}<small>{session.role==='admin'?'Gerência':'Professor'}</small></span><button className="button" onClick={logout}>Sair</button></div></header><AdminNav/>{children}</main>;
 }
-function ErrorBox({error}) {return error && <div className="notice error" role="alert">{error}</div>;}
-function Badge({status}) {return <span className={`dw-badge ${status}`}>{labels[status]||status}</span>;}
+export function ErrorBox({error}) {return error && <div className="notice error" role="alert">{error}</div>;}
+export function Badge({status}) {return <span className={`dw-badge ${status}`}>{labels[status]||status}</span>;}
 function Modal({title,onClose,children}) { useEffect(()=>{const fn=e=>{if(e.key==='Escape')onClose();};document.addEventListener('keydown',fn);return()=>document.removeEventListener('keydown',fn);},[onClose]);return <div className="dw-overlay"><section role="dialog" aria-modal="true" aria-label={title} className="dw-modal"><header><h2>{title}</h2><button aria-label="Fechar" className="button" onClick={onClose}>Fechar</button></header>{children}</section></div>; }
-function RecordText({row}) {return row.record ? <><strong>{row.record.contact==='not_observed'?'Não foi possível observar':labels[row.record.outcome]}</strong>{row.record.pain && <span> · {labels[row.record.pain]}</span>}{row.record.note && <p>{row.record.note}</p>}</> : row.legacy ? <><strong>Registro anterior · {row.performance}</strong><p>{[row.observation,row.evolution,row.pain_description].filter(Boolean).join(' · ')}</p></> : <span className="dw-muted">Ainda sem registro</span>;}
-function History({row,onClose}) {
+export function RecordText({row}) {return row.record ? <><strong>{row.record.contact==='not_observed'?'Não foi possível observar':labels[row.record.outcome]}</strong>{row.record.pain && <span> · {labels[row.record.pain]}</span>}{row.record.note && <p>{row.record.note}</p>}</> : row.legacy ? <><strong>Registro anterior · {row.performance}</strong><p>{[row.observation,row.evolution,row.pain_description].filter(Boolean).join(' · ')}</p></> : <span className="dw-muted">Ainda sem registro</span>;}
+export function History({row,onClose}) {
   const {data,error,loading}=useData(`/api/daily/students/${row.client_id}/history`);
   return <Modal title={`Histórico · ${row.student_name}`} onClose={onClose}><ErrorBox error={error}/>{loading?<p>Carregando histórico…</p>:<><h3>Registros diários</h3>{data?.records.map(r=><article className="dw-history" key={r.id}><div><strong>{dateLabel(r.entered_at)}</strong> <Badge status={r.status}/></div><RecordText row={r}/><small>{r.actor||r.finalized_by||r.professor}</small>{r.edits?.length>1&&<details><summary>Ver {r.edits.length} versões</summary>{r.edits.map((edit,i)=><p key={i}>{new Date(edit.created_at).toLocaleString('pt-BR')} · {edit.actor}<br/>{edit.payload.after.contact==='not_observed'?'Não observado':labels[edit.payload.after.outcome]} · {edit.payload.after.note||'Sem observação'}</p>)}</details>}</article>)}<h3>Acompanhamentos</h3>{!data?.actions.length && <p>Nenhuma ação registrada.</p>}{data?.actions.map(a=><article className="dw-history" key={a.id}><Badge status={a.status}/><p>{a.title}</p><p>{a.instruction}</p>{a.result&&<p><strong>Resultado:</strong> {a.result}</p>}<small>{a.assigned_to} · {dateLabel(a.due_date)}</small></article>)}</>}</Modal>;
 }

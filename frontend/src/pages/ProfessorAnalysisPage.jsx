@@ -52,13 +52,14 @@ export function ProfessorAnalysisPage() {
   return <div className="page professor-analysis">
     <AdminNav />
     <header className="page-heading">
-      <div><span className="eyebrow">GESTÃO DA EQUIPE</span><h1>Histórico semanal</h1>
-        <p>Consulta dos registros antigos. Novos acompanhamentos são feitos exclusivamente no registro diário.</p></div>
+      <div><span className="eyebrow">GESTÃO DA EQUIPE</span><h1>Arquivo semanal antigo</h1>
+        <p>Registros do formulário semanal anterior. O histórico semanal atual é consolidado automaticamente a partir dos registros diários.</p></div>
       <div className="frequency-actions">
         <button className="button ghost" onClick={logout}><LogOut size={17} />Sair</button>
         <button className="button primary" disabled={loading} onClick={() => setRevision((n) => n + 1)}><RefreshCw size={17} className={loading ? "spin" : ""} />Atualizar análise</button>
       </div>
     </header>
+    <p><Link to="/admin/historico-semanal">← Voltar ao histórico semanal dos registros diários</Link></p>
     <section className="analysis-period" aria-label="Período de análise">
       <div className="analysis-week">
         <button className="button" aria-label="Semana anterior" onClick={() => setStart(shiftWeek(start, -1))}><ChevronLeft size={18} /></button>

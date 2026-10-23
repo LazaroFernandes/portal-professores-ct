@@ -8,6 +8,7 @@ const FrequencyPage = lazy(() => import("./pages/FrequencyPage").then((module) =
 const ProfessorAnalysisPage = lazy(() => import("./pages/ProfessorAnalysisPage").then((module) => ({ default: module.ProfessorAnalysisPage })));
 
 const DailyPage = lazy(() => import("./pages/DailyWorkflow").then(m => ({ default: m.DailyPage })));
+const WeeklyHistoryPage = lazy(() => import("./pages/WeeklyHistoryPage").then(m => ({ default: m.WeeklyHistoryPage })));
 const ActionsPage = lazy(() => import("./pages/DailyWorkflow").then(m => ({ default: m.ActionsPage })));
 
 function Protected({ children, roles }) {
@@ -25,7 +26,8 @@ export default function App() {
     <Route path="/login" element={<LoginPage />} />
     <Route path="/vencimentos" element={<Protected roles={["admin"]}><FrequencyPage /></Protected>} />
     <Route path="/admin/professores" element={<Protected roles={["admin"]}><DailyPage analysis /></Protected>} />
-    <Route path="/admin/historico-semanal" element={<Protected roles={["admin"]}><ProfessorAnalysisPage /></Protected>} />
+    <Route path="/admin/historico-semanal" element={<Protected roles={["admin"]}><WeeklyHistoryPage /></Protected>} />
+    <Route path="/admin/registros-semanais-antigos" element={<Protected roles={["admin"]}><ProfessorAnalysisPage /></Protected>} />
     <Route path="/acoes" element={<Protected roles={["admin", "professor"]}><ActionsPage /></Protected>} />
     <Route path="/academia" element={<Protected roles={["admin", "professor"]}><DailyPage /></Protected>} />
     <Route path="/pendencias" element={<Protected roles={["admin", "professor"]}><DailyPage pending /></Protected>} />

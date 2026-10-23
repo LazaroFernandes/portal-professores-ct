@@ -47,15 +47,15 @@ class PresenceAccessTests(unittest.TestCase):
         url = f'/api/presence/{other["id"]}/attendance'
         self.assertEqual(self.client.put(url, json={'desempenho': 'Bom'}).status_code, 403)
         self.app.dependency_overrides[require_csrf] = lambda: user
-        self.assertEqual(self.client.put(url, json={'desempenho': 'Bom'}).status_code, 404)
+        self.assertEqual(self.client.put(url, json={'desempenho': 'Bom'}).status_code, 410)
         self.assertTrue(all(not s['attendance_finalized_at'] for s in self.store.active(self.now)))
 
-    def test_own_attendance_is_saved_and_reopened(self):
+    def test_legacy_attendance_write_is_retired_without_mutation(self):
         self.app.dependency_overrides[require_csrf] = lambda: {'role': 'professor', 'name': 'Professor 1'}
         own = next(s for s in self.store.active(self.now) if s['client_id'] == '1')
         result = self.client.put(f'/api/presence/{own["id"]}/attendance', json={'desempenho': 'Bom', 'observacao': 'Teste'})
-        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.status_code, 410)
         reopened = service.PresenceStore(self.store.path)
         record = next(s for s in reopened.active(self.now, include_finished=True) if s['client_id'] == '1')
-        self.assertEqual(record['observation'], 'Teste')
-        self.assertEqual(record['status'], 'ATENDIMENTO FINALIZADO')
+        self.assertEqual(record['observation'], '')
+        self.assertIsNone(record['attendance_finalized_at'])

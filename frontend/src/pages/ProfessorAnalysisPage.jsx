@@ -52,8 +52,8 @@ export function ProfessorAnalysisPage() {
   return <div className="page professor-analysis">
     <AdminNav />
     <header className="page-heading">
-      <div><span className="eyebrow">GESTÃO DA EQUIPE</span><h1>Análise dos professores</h1>
-        <p>Veja a cobertura do acompanhamento e os registros que precisam de atenção.</p></div>
+      <div><span className="eyebrow">GESTÃO DA EQUIPE</span><h1>Histórico semanal</h1>
+        <p>Consulta dos registros antigos. Novos acompanhamentos são feitos exclusivamente no registro diário.</p></div>
       <div className="frequency-actions">
         <button className="button ghost" onClick={logout}><LogOut size={17} />Sair</button>
         <button className="button primary" disabled={loading} onClick={() => setRevision((n) => n + 1)}><RefreshCw size={17} className={loading ? "spin" : ""} />Atualizar análise</button>

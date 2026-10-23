@@ -31,7 +31,7 @@ function statusClass(status) {
   return "active";
 }
 
-function TrainingDetails({ detail }) {
+export function TrainingDetails({ detail }) {
   return <div className="training-detail-panel">
     <div className="training-detail-heading">
       <div className="training-detail-icon"><Dumbbell size={20} /></div>

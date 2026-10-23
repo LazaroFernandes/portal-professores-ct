@@ -12,7 +12,8 @@ export async function api(path, options = {}) {
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
-    const error = new Error(payload?.detail || payload || "Não foi possível concluir a solicitação.");
+    const detail = Array.isArray(payload?.detail) ? payload.detail.map(item => item.msg.replace('Value error, ', '')).join(' ') : payload?.detail;
+    const error = new Error(detail || payload || "Não foi possível concluir a solicitação.");
     error.status = response.status;
     throw error;
   }

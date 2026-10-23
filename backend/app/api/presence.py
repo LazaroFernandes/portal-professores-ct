@@ -30,6 +30,7 @@ def training_detail(
     user: dict = Depends(current_user),
 ) -> dict:
     try:
+        presence_service.refresh_training_if_due()
         return presence_service.training_detail_for_visit(visit_id, user)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -43,6 +44,4 @@ def save_attendance(
     data: DailyAttendanceUpdate,
     user: dict = Depends(require_csrf),
 ) -> dict:
-    if not presence_service.finalize_attendance(visit_id, data, user):
-        raise HTTPException(status_code=404, detail="Atendimento não encontrado.")
-    return {"saved": True, "status": "ATENDIMENTO FINALIZADO"}
+    raise HTTPException(410, "Use o novo registro diário em /api/daily/records/{visit_id}.")

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeWeek, weekEnd, needsAttention } from './weeklyHistoryUtils';
+import { summarizeWeek, weekEnd, needsAttention, weeklyActions, attentionReasons } from './weeklyHistoryUtils';
 import { weekStart } from './professorAnalysisUtils';
 const rows = [
  {id:1,client_id:'a',student_name:'Ágata',entered_at:'2026-10-19T08:00:00',professor:'Anderson',status:'registered',record:{outcome:'completed',pain:'no'}},
@@ -14,4 +14,18 @@ describe('weekly history from daily records',()=>{
  it('includes legacy daily discomfort in exceptions',()=>{expect(needsAttention(rows[3])).toBe(true);expect(summarizeWeek(rows,{situation:'attention'}).unique_students).toBe(2);});
  it('uses Monday through Sunday even across year boundaries',()=>{expect(weekStart('2027-01-03')).toBe('2026-12-28');expect(weekEnd('2026-12-28')).toBe('2027-01-03');});
  it('reflects corrected daily records without a separate weekly copy',()=>{expect(summarizeWeek(rows.map(r=>r.id===3?{...r,status:'registered'}:r)).pending).toBe(0);expect(summarizeWeek([]).unique_students).toBe(0);});
+});
+
+describe('weekly manager follow-ups', () => {
+ const range = {start:'2026-10-19',end:'2026-10-25',clientIds:['a']};
+ const event = (created_at,actor='Anderson') => ({created_at,actor,payload:{event:'updated',after:{status:'resolved',result:'Retorno realizado'}}});
+ const actions = [
+  {id:1,client_id:'a',student_name:'Ágata',created_at:'2026-10-10T10:00:00-03:00',assigned_to:'Camila',status:'in_progress',events:[]},
+  {id:2,client_id:'b',student_name:'Bruno',created_at:'2026-10-10T10:00:00-03:00',assigned_to:'Camila',status:'resolved',events:[event('2026-10-20T10:00:00-03:00')]},
+  {id:3,client_id:'c',student_name:'Carlos',created_at:'2026-10-10T10:00:00-03:00',status:'resolved',events:[event('2026-10-19T01:00:00Z')]},
+ ];
+ it('includes existing open follow-ups and weekly resolutions without visits', () => {expect(weeklyActions(actions,range).map(a=>a.id)).toEqual([1,2]);});
+ it('uses Sao Paulo week boundaries and never includes prior-week updates', () => {expect(weeklyActions([actions[2]],range)).toEqual([]);});
+ it('filters by actor as well as current assignee without inventing who acted', () => {const result=weeklyActions(actions,{...range,professor:'Anderson'});expect(result.map(a=>a.id)).toEqual([2]);expect(result[0].weeklyEvents[0].actor).toBe('Anderson');});
+ it('explains each attention signal and keeps missing registration distinct',()=>{expect(attentionReasons({status:'pending'})).toEqual([]);expect(attentionReasons({record:{pain:'yes',outcome:'interrupted',follow_up:true}})).toEqual(['Desconforto relatado','Treino interrompido','Retorno solicitado']);});
 });

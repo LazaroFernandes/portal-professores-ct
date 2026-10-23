@@ -43,3 +43,25 @@ export function summarizeWeek(rows, { professor = '', search = '', situation = '
     not_observed: visible.filter(r => r.status === 'not_observed').length,
     pending: visible.filter(r => r.status === 'pending').length };
 }
+
+export function attentionReasons(row) {
+  const reasons = [];
+  if (row.status === 'not_observed') reasons.push('Não observado');
+  if (row.record?.pain === 'yes' || (row.legacy && row.had_pain)) reasons.push('Desconforto relatado');
+  if (row.record?.outcome === 'interrupted') reasons.push('Treino interrompido');
+  if (row.record?.outcome === 'adapted') reasons.push('Treino adaptado');
+  if (row.record?.follow_up) reasons.push('Retorno solicitado');
+  return reasons;
+}
+
+export function weeklyActions(actions, { start, end, professor = '', search = '', clientIds = [] }) {
+  const inWeek = value => {
+    if (!value) return false;
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
+    return day >= start && day <= end;
+  };
+  return actions.filter(a => normalized(a.student_name).includes(normalized(search).trim()))
+    .map(a => ({ ...a, weeklyEvents: (a.events || []).filter(e => inWeek(e.created_at)) }))
+    .filter(a => a.weeklyEvents.length || (a.status !== 'resolved' && (inWeek(a.created_at) || clientIds.includes(a.client_id))))
+    .filter(a => !professor || a.assigned_to === professor || a.weeklyEvents.some(e => e.actor === professor));
+}

@@ -67,8 +67,8 @@ class NextFitV2Client:
                 "Origin": "https://app.nextfit.com.br",
                 "Referer": "https://app.nextfit.com.br/",
             },
-            data=f"grant_type=refresh_token&refresh_token={self.refresh_token}"
-                 f"&app_id=nextfit-sistema-academia",
+            data={"grant_type": "refresh_token", "refresh_token": self.refresh_token,
+                  "app_id": "nextfit-sistema-academia"},
             timeout=30,
         )
         if resp.status_code != 200:

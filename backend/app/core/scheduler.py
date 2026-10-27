@@ -18,6 +18,15 @@ def _scheduled_refresh() -> None:
         logger.exception("Atualização automática de frequência falhou")
 
 
+def _maintain_nextfit_session() -> None:
+    from ..services.nextfit_session import maintain_session
+    try:
+        maintain_session()
+    except Exception:
+        # Never emit token responses, authorization headers or credential values.
+        logger.error("Falha ao renovar sessão NEXT; verificar integração no portal")
+
+
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler and _scheduler.running:
@@ -32,6 +41,11 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True,
         coalesce=True,
         max_instances=1,
+    )
+    _scheduler.add_job(
+        _maintain_nextfit_session, trigger="interval", minutes=30,
+        id="nextfit-session-renewal", replace_existing=True,
+        coalesce=True, max_instances=1,
     )
     _scheduler.start()
     logger.info("Agendamento de vencimentos ativo: diariamente às 05:00 (%s)", TIMEZONE.key)

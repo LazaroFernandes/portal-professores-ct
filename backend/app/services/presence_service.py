@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from nextfit_v2_client import NextFitV2Client
+from nextfit_v2_client import NextFitV2Client, TokenExpiredError
 
 from ..core.cache import cache
 from ..core.config import PROJECT_ROOT
@@ -494,18 +494,9 @@ def _store() -> PresenceStore:
     return PresenceStore(_database_path())
 
 
-@lru_cache(maxsize=1)
 def _nextfit_client() -> NextFitV2Client:
-    token = os.environ.get("NEXTFIT_V2_TOKEN", "").strip()
-    unit = os.environ.get("NEXTFIT_CODIGO_UNIDADE", "").strip()
-    if not token or not unit:
-        raise RuntimeError("Integração de presenças do NextFit não configurada.")
-    return NextFitV2Client(
-        token=token,
-        codigo_unidade=unit,
-        refresh_token=os.environ.get("NEXTFIT_V2_REFRESH_TOKEN", "").strip() or None,
-        env_path=PROJECT_ROOT / ".env",
-    )
+    from .nextfit_session import client
+    return client(_store())
 
 
 def refresh_if_due(now: datetime | None = None) -> None:
@@ -530,6 +521,8 @@ def refresh_if_due(now: datetime | None = None) -> None:
             _last_sync_error = None
         except Exception:
             _last_sync_error = "Acessos atualizados; não foi possível atualizar a carteira de professores."
+    except TokenExpiredError:
+        _last_sync_error = "A sessão do NEXT expirou ou foi revogada. A gerência precisa reconectar a integração."
     except Exception as exc:
         _last_sync_error = "Não foi possível atualizar os acessos. Verifique a integração NextFit."
     finally:

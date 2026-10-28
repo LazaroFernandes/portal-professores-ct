@@ -1,4 +1,5 @@
 .git
+.local-finance
 .venv
 .venv-*
 frontend/node_modules

@@ -1,4 +1,5 @@
 .env
+.local-finance/
 .venv/
 credentials/
 frontend/node_modules/

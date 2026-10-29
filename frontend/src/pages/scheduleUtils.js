@@ -15,3 +15,16 @@ export function monthSummary(shifts, month) {
   return {total, saturdays, saturdayMinutes:perSaturday*saturdays, perSaturday};
 }
 export const overlaps = (shift, day, start, end) => shift.day === day && minutes(shift.start) < end && minutes(shift.end) > start;
+
+// Minimum and maximum simultaneous coverage within an hour, including minute changes.
+export function coverageRange(teachers, day, start, end, source = 'nextfit') {
+  const team = teachers.filter(t => t.source === source);
+  const boundaries = new Set([start, end]);
+  for (const t of team) for (const shift of t.shifts) {
+    if (shift.day !== day) continue;
+    for (const value of [minutes(shift.start), minutes(shift.end)]) if (start < value && value < end) boundaries.add(value);
+  }
+  const samples = [...boundaries].sort((a,b) => a-b).slice(0,-1);
+  const counts = samples.map(point => team.filter(t => t.shifts.some(s => s.day === day && minutes(s.start) <= point && point < minutes(s.end))).length);
+  return {min:Math.min(...counts), max:Math.max(...counts)};
+}

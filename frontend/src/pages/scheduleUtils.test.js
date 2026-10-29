@@ -13,3 +13,13 @@ describe('escala mensal', () => {
     expect(overlaps(shift,2,480,540)).toBe(false);
   });
 });
+
+import { coverageRange } from './scheduleUtils';
+it('counts real and test professors separately and respects changes within the hour', () => {
+ const teachers=[{source:'nextfit',shifts:[{day:0,start:'05:00',end:'08:00'}]},{source:'nextfit',shifts:[{day:0,start:'06:30',end:'13:00'}]},{source:'test',shifts:[{day:0,start:'05:00',end:'12:00'}]}];
+ expect(coverageRange(teachers,0,300,360)).toEqual({min:1,max:1});
+ expect(coverageRange(teachers,0,360,420)).toEqual({min:1,max:2});
+ expect(coverageRange(teachers,0,480,540)).toEqual({min:1,max:1});
+ expect(coverageRange(teachers,0,300,360,'test')).toEqual({min:1,max:1});
+ expect(coverageRange(teachers,1,300,360)).toEqual({min:0,max:0});
+});

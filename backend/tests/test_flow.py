@@ -10,8 +10,8 @@ def test_dedupe_denominator_minutes_and_test_separation():
  teachers=[{'source':'nextfit','shifts':[{'day':0,'start':'08:30','end':'09:00'}]},{'source':'test','shifts':[{'day':0,'start':'08:00','end':'10:00'}]}]
  rows=[row(1,'2026-10-19T08:00:00-03:00'),row(1,'2026-10-19T08:05:00-03:00'),row(2,'2026-10-19T08:00:00-03:00'),row(3,'2026-10-19T08:00:00-03:00','HYROX')]
  r=analyze(rows,teachers,date(2026,10,19),date(2026,10,26),90)
- c=cell(r,'08:30');assert c['mean']==1 and c['days']==2 and c['peak']==2
- assert c['scheduled']==1 and c['test']==1 and c['missing3']==0
+ c=cell(r,'08:00');assert c['mean']==1 and c['days']==2 and c['peak']==2
+ assert c['scheduled']==0 and c['scheduled_max']==1 and c['test']==1 and c['missing3']==1 and c['missing3_min']==0
  c=cell(r,'09:00');assert c['scheduled']==0 and c['missing4']==1
 
 def test_round_up_and_unavailable():
@@ -25,7 +25,7 @@ def test_round_up_and_unavailable():
 def test_previous_day_and_stay():
  rows=[row(1,'2026-10-18T23:30:00-03:00'),row(2,'2026-10-19T07:45:00-03:00')]
  r=analyze(rows,[],date(2026,10,19),date(2026,10,19),90)
- assert cell(r,'09:00')['mean']==1
+ assert cell(r,'09:00')['mean']==0.25
  assert cell(analyze(rows,[],date(2026,10,19),date(2026,10,19),60),'09:00')['mean']==0
 
 def test_access_validation_and_source_failure(monkeypatch):
@@ -45,3 +45,25 @@ def test_access_validation_and_source_failure(monkeypatch):
   monkeypatch.setattr(flow,'overview',fail)
   r=c.get(url);assert r.status_code==503 and 'private' not in r.text
  finally: app.dependency_overrides.clear()
+
+def test_full_hour_late_entries_dedup_and_peak_between_boundaries():
+ rows=[row(1,'2026-10-19T05:30:00-03:00'),row(1,'2026-10-19T05:30:00-03:00'),row(2,'2026-10-19T05:45:00-03:00')]
+ r=analyze(rows,[],date(2026,10,19),date(2026,10,19),60)
+ c=cell(r,'05:00');assert c['mean']==0.75 and c['peak']==2
+ assert r['rows'][0]['label']=='05:00–06:00' and len(r['rows'])==17
+ assert cell(r,'06:00')['mean']==1.25
+
+def test_teacher_handover_does_not_sum_non_simultaneous_people():
+ teachers=[{'source':'nextfit','shifts':[{'day':0,'start':'05:00','end':'05:30'}]}, {'source':'nextfit','shifts':[{'day':0,'start':'05:30','end':'06:00'}]}]
+ c=cell(analyze([row(1,'2026-10-19T05:15:00-03:00')],teachers,date(2026,10,19),date(2026,10,19),90),'05:00')
+ assert c['scheduled']==1 and c['scheduled_max']==1 and c['missing4']==0
+
+def test_seconds_and_exact_hour_boundary_exclusion():
+ rows=[row(1,'2026-10-19T05:59:30-03:00'),row(2,'2026-10-19T06:00:00-03:00')]
+ c=cell(analyze(rows,[],date(2026,10,19),date(2026,10,19),60),'05:00')
+ assert abs(c['mean']-1/120)<1e-10 and c['peak']==1
+
+def test_upstream_records_outside_selected_period_do_not_confirm_zero():
+ r=analyze([row(1,'2026-10-20T05:30:00-03:00')],[],date(2026,10,19),date(2026,10,19),90)
+ assert not r['data_available'] and r['eligible_records']==0
+ assert cell(r,'05:00')['mean'] is None

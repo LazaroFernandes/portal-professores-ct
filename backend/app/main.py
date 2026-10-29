@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import auth, frequency, professor, professor_analysis, presence, daily, finance, schedule
+from .api import auth, frequency, professor, professor_analysis, presence, daily, finance, schedule, flow
 from .core.config import get_settings
 from .core.scheduler import start_scheduler, stop_scheduler
 
@@ -77,6 +77,7 @@ def health() -> dict:
 app.include_router(daily.router)
 app.include_router(finance.router)
 app.include_router(schedule.router)
+app.include_router(flow.router)
 app.include_router(presence.router)
 app.include_router(auth.router)
 app.include_router(frequency.router)

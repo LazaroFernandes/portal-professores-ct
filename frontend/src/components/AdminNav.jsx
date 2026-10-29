@@ -10,6 +10,7 @@ export function AdminNav() {
     {session.role === "admin" && <><NavLink to="/vencimentos"><CalendarCheck size={17} />Vencimentos</NavLink>
     <NavLink to="/admin/financeiro">Financeiro</NavLink>
     <NavLink to="/admin/horarios">Horários e salários</NavLink>
+    <NavLink to="/admin/fluxo">Fluxo e cobertura</NavLink>
     <NavLink to="/admin/professores"><Users size={17} />Análise diária</NavLink></>}
     <NavLink to="/acoes"><ClipboardList size={17} />Ações e retornos</NavLink>
     <NavLink to="/pendencias">Pendências</NavLink>

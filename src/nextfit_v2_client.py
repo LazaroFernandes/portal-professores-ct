@@ -137,7 +137,7 @@ class NextFitV2Client:
         millis = "999" if end_of_day else "000"
         return dt_utc.strftime(f"%Y-%m-%dT%H:%M:%S.{millis}Z")
 
-    def presencas(self, data_inicial: datetime, data_final: datetime) -> list[dict[str, Any]]:
+    def presencas(self, data_inicial: datetime, data_final: datetime, *, strict: bool = False) -> list[dict[str, Any]]:
         """Lista todas as presenças (Acesso + Agenda) no período informado.
 
         `data_inicial` e `data_final` podem ser datetimes naive (assumidos como
@@ -147,7 +147,7 @@ class NextFitV2Client:
         automaticamente em janelas de 80 dias e concatenados.
         """
         fields = json.dumps([
-            "Id", "Descricao", "Inativo", "NomeCliente",
+            "Id", "CodigoCliente", "Descricao", "Inativo", "NomeCliente",
             "DescricaoModalidade", "DescricaoContrato", "DescricaoTipo",
             "Data", "DddCliente",
         ])
@@ -176,7 +176,11 @@ class NextFitV2Client:
                     "filter": "[]",
                 }
                 data = self._get("/api/v2/RelCliente/RecuperarPresencas", params)
+                if strict and (not isinstance(data, dict) or not isinstance(data.get("Content"), list) or not isinstance(data.get("Last"), bool)):
+                    raise RuntimeError("Resposta de acessos incompleta")
                 content = data.get("Content") or []
+                if strict and not content and not data.get("Last"):
+                    raise RuntimeError("Página de acessos incompleta")
                 results.extend(content)
                 if data.get("Last") or not content:
                     break

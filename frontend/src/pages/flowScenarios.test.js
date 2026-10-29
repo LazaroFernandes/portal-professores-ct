@@ -11,3 +11,15 @@ it('does not turn missing analysis data into covered hours',()=>{
  expect(scenarios(missing,4).current.missingMax).toBeNull();
  expect(summarizeScenarios([cell,missing],4)).toEqual({count:1,current:1,proposed:0,improved:1,resolved:1});
 });
+
+it('classifies exact coverage, surplus, shortage and changes within the hour',async()=>{
+ const {coverageStatus}=await import('./flowScenarios');
+ expect(coverageStatus({min:2,max:2},2).state).toBe('sufficient');
+ expect(coverageStatus({min:3,max:4},2)).toMatchObject({state:'surplus',detail:'1–2 prof. a mais'});
+ expect(coverageStatus({min:1,max:4},2).state).toBe('deficit');
+ expect(coverageStatus({min:2,max:4},2).state).toBe('variable');
+ expect(coverageStatus({min:0,max:0},0).state).toBe('sufficient');
+ expect(coverageStatus({min:1,max:1},0).state).toBe('surplus');
+ expect(coverageStatus({min:null,max:null},2).state).toBe('unknown');
+ expect(coverageStatus({min:2,max:2},null).state).toBe('unknown');
+});

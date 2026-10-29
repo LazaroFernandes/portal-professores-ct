@@ -3,7 +3,7 @@ import {api} from '../api/client';
 import {Shell,ErrorBox} from './DailyWorkflow';
 import {days} from './scheduleUtils';
 import './flow.css';
-import {scenarios,summarizeScenarios} from './flowScenarios';
+import {scenarios,summarizeScenarios,coverageStatus} from './flowScenarios';
 const iso=d=>{const x=new Date();x.setDate(x.getDate()+d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;};
 const date=s=>s.split('-').reverse().join('/');
 const show=n=>n===null?'—':n;
@@ -11,9 +11,9 @@ const range=(low,high)=>low==null?'—':low===high?low:`${low}–${high}`;
 function ScenarioCard({label,caption,value,tone}) {
  return <article className={`flow-overview-card ${tone}`}><span>{label}</span><strong>{value}</strong><small>{caption}</small></article>;
 }
-function CoveragePanel({label,caption,scenario,kind}) {
- const state=scenario.missingMax==null?'unknown':scenario.missingMax>0?'deficit':'sufficient';
- return <div className={`flow-scenario ${kind} ${state}`}><strong>{label}</strong><small>{caption}</small><b className="flow-count">{range(scenario.min,scenario.max)} <small>prof.</small></b><span className="flow-result">{state==='unknown'?'Sem dados':state==='sufficient'?'✓ Coberto':`Faltam ${range(scenario.missingMin,scenario.missingMax)}`}</span></div>;
+function CoveragePanel({label,caption,scenario,kind,need}) {
+ const status=coverageStatus(scenario,need);
+ return <div className={`flow-scenario ${kind} ${status.state}`}><strong>{label}</strong><small>{caption}</small><b className="flow-count">{range(scenario.min,scenario.max)} <small>prof.</small></b><span className="flow-result">{status.label}</span><small className="flow-status-detail">{status.detail}</small></div>;
 }
 export function FlowPage(){
  const [start,S]=useState(()=>iso(-14)),[end,E]=useState(()=>iso(-1)),[stay,T]=useState('90'),[data,D]=useState(null),[error,X]=useState(''),[loading,L]=useState(false);
@@ -45,12 +45,13 @@ export function FlowPage(){
  <ScenarioCard label="NOVO · NEXT + testes" value={summary.count?summary.proposed:'—'} caption="faixas ainda com falta" tone="proposed"/>
  <ScenarioCard label="IMPACTO DA SIMULAÇÃO" value={summary.count?summary.resolved:'—'} caption={`faixas com falta zerada · ${summary.improved} melhoradas no total`} tone="impact"/>
  </div>
- <p className="flow-legend">Comparação de {summary.count} faixas dia/horário com dados nos filtros. Vermelho: falta em algum trecho da hora. Verde: cobertura suficiente para a referência média selecionada. Os mesmos alunos e a mesma necessidade são usados nos dois cenários. Testes representam simulação de escala, não presença efetiva.</p>
+ <p className="flow-legend">Comparação de {summary.count} faixas dia/horário com dados nos filtros. Os estados comparam a escala com a necessidade estimada na referência selecionada. Se houver falta em qualquer trecho da hora, o alerta vermelho tem prioridade. Os mesmos alunos e a mesma necessidade são usados nos dois cenários. Testes representam simulação de escala, não presença efetiva.</p>
+ <div className="flow-status-legend" aria-label="Legenda da cobertura"><span className="deficit">▼ Faltam professores</span><span className="sufficient">✓ Quantidade adequada</span><span className="surplus">▲ Acima do necessário</span><span className="variable">✓ OK / ▲ Acima · varia na hora</span></div>
  <div className="flow-table-wrap"><table className={`flow-table flow-comparison-table ${columns.length===1?'flow-table-single':''}`}><thead><tr><th>Faixa</th>{columns.map(({name,index})=><th key={name}>{name}<small>{data.dates[index].length} dia(s)</small></th>)}</tr></thead><tbody>{data.rows.map(row=><tr key={row.time}><th scope="row">{row.label}</th>{columns.map(({index})=>{const c=row.cells[index],s=scenarios(c,ratio);return <td key={index}>
  <div className="flow-demand"><strong>{c.mean===null?'—':c.mean.toLocaleString('pt-BR',{maximumFractionDigits:2})}</strong><span>alunos simultâneos em média</span><b>Precisa: {show(s.need)} prof.</b></div>
  <div className={`flow-scenarios ${view!=='both'?'single':''}`}>
- {view!=='proposed'&&<CoveragePanel label="ATUAL" caption="Somente NEXT" scenario={s.current} kind="current"/>}
- {view!=='current'&&<CoveragePanel label="NOVO" caption="NEXT + testes" scenario={s.proposed} kind="proposed"/>}
+ {view!=='proposed'&&<CoveragePanel label="ATUAL" caption="Somente NEXT" scenario={s.current} need={s.need} kind="current"/>}
+ {view!=='current'&&<CoveragePanel label="NOVO" caption="NEXT + testes" scenario={s.proposed} need={s.need} kind="proposed"/>}
  </div>
  {c.test>0&&<span className="flow-test-badge">+ {range(c.test_min,c.test)} de teste no novo cenário</span>}
  {s.improvement>0&&<span className="flow-improvement">↓ {s.improvement} a menos na maior falta da faixa</span>}

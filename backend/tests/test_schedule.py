@@ -11,11 +11,12 @@ def test_schedule_admin_persistence_and_validation(tmp_path, monkeypatch):
     monkeypatch.setattr(schedule, '_store', lambda: store)
     app.dependency_overrides[current_user] = lambda: {'role': 'admin', 'csrf': 'token'}
     client = TestClient(app)
-    teacher = {'id': 'test:1', 'name': 'Teste', 'source': 'test', 'rate': 25, 'shifts': [{'day': 0, 'start': '08:00', 'end': '12:30'}]}
+    teacher = {'id': 'test:1', 'name': 'Teste', 'source': 'test', 'color_group': 'rose', 'rate': 25, 'shifts': [{'day': 0, 'start': '08:00', 'end': '12:30'}]}
     try:
         assert client.put('/api/admin/schedule', json={'teachers': [teacher]}).status_code == 403
         assert client.put('/api/admin/schedule', json={'teachers': [teacher]}, headers={'X-CSRF-Token': 'token'}).status_code == 200
         assert client.get('/api/admin/schedule').json()['teachers'][0]['name'] == 'Teste'
+        assert client.get('/api/admin/schedule').json()['teachers'][0]['color_group'] == 'rose'
         teacher['shifts'][0]['end'] = '07:00'
         assert client.put('/api/admin/schedule', json={'teachers': [teacher]}, headers={'X-CSRF-Token': 'token'}).status_code == 422
         app.dependency_overrides[current_user] = lambda: {'role': 'professor', 'csrf': 'token'}

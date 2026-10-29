@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import time
+from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator, model_validator
 from nextfit_client import NextFitClient
@@ -24,6 +25,7 @@ class Teacher(BaseModel):
     id: str = Field(min_length=1, max_length=100)
     name: str = Field(min_length=1, max_length=120)
     source: str
+    color_group: Literal["rose", "blue", "green"] = "blue"
     rate: float = Field(ge=0, le=100000, allow_inf_nan=False)
     shifts: list[Shift] = Field(max_length=200)
     @model_validator(mode='after')

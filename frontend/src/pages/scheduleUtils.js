@@ -18,7 +18,7 @@ export const overlaps = (shift, day, start, end) => shift.day === day && minutes
 
 // Minimum and maximum simultaneous coverage within an hour, including minute changes.
 export function coverageRange(teachers, day, start, end, source = 'nextfit') {
-  const team = teachers.filter(t => t.source === source);
+  const team = teachers.filter(t => source === null || t.source === source);
   const boundaries = new Set([start, end]);
   for (const t of team) for (const shift of t.shifts) {
     if (shift.day !== day) continue;

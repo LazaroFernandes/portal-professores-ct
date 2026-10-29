@@ -20,6 +20,8 @@ it('counts real and test professors separately and respects changes within the h
  expect(coverageRange(teachers,0,300,360)).toEqual({min:1,max:1});
  expect(coverageRange(teachers,0,360,420)).toEqual({min:1,max:2});
  expect(coverageRange(teachers,0,480,540)).toEqual({min:1,max:1});
+ expect(coverageRange(teachers,0,300,360,null)).toEqual({min:2,max:2});
+ expect(coverageRange(teachers,0,360,420,null)).toEqual({min:2,max:3});
  expect(coverageRange(teachers,0,300,360,'test')).toEqual({min:1,max:1});
  expect(coverageRange(teachers,1,300,360)).toEqual({min:0,max:0});
 });

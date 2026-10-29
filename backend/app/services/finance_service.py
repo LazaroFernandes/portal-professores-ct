@@ -11,7 +11,7 @@ import threading
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from zoneinfo import ZoneInfo
 
@@ -116,7 +116,10 @@ def source_snapshot():
             mov = pool.submit(read_v1, 'MovimentoFinanceiro')
             rec = pool.submit(read_v1, 'ContaReceber')
             pay = pool.submit(read_payables)
-            raw = (mov.result(), rec.result(), pay.result())
+            clients = pool.submit(read_v1, 'Pessoa/GetClientes')
+            contracts = pool.submit(read_v1, 'ContratoCliente')
+            plans = pool.submit(read_v1, 'ContratoBase')
+            raw = (mov.result(), rec.result(), pay.result(), clients.result(), contracts.result(), plans.result())
         _cached = normalize(*raw)
         _expires = time.monotonic() + 900
         return _cached
@@ -144,10 +147,55 @@ def request_dashboard(selected):
         return None
 
 
-def normalize(movements, receivables, payables):
+def identifier(value):
+    return str(value) if value is not None and value != '' else None
+
+
+def renewal_candidates(clients, contracts, plans):
+    """A dated renewal agenda, never a monetary addition to the forecast."""
+    people = {identifier(c['id']): c for c in clients}
+    plan_names = {identifier(p['id']): str(p.get('descricao') or '').strip() for p in plans}
+    eligible = []
+    for contract in contracts:
+        cid = identifier(contract.get('codigoCliente'))
+        person = people.get(cid, {})
+        inactive = person.get('inativo', (person.get('cliente') or {}).get('inativo', False))
+        if str(inactive).strip().lower() in ('true', '1', 'sim'):
+            continue
+        if str(contract.get('status') or '').strip().casefold() != 'ativo' or day(contract.get('dataEncerramento')):
+            continue
+        due = day(contract.get('dataValidade'))
+        if not cid or not due:
+            continue
+        eligible.append((contract, cid, due))
+    result = []
+    for contract, cid, due in eligible:
+        plan_id = identifier(contract.get('codigoContratoBase'))
+        start = day(contract.get('dataInicio'))
+        # Keep parallel plans. Suppress only an identifiable contiguous successor
+        # for this same plan/client that already extends the coverage.
+        successor = any(other['id'] != contract['id'] and other_cid == cid and plan_id is not None
+            and identifier(other.get('codigoContratoBase')) == plan_id and other_due > due
+            and start is not None and day(other.get('dataInicio')) is not None
+            and start < day(other['dataInicio']) <= due + timedelta(days=1)
+            for other, other_cid, other_due in eligible)
+        if successor:
+            continue
+        result.append({'id':'contract:'+str(contract['id']), 'client_id':cid,
+            'client_name':str(people.get(cid, {}).get('nome') or '').strip() or None,
+            'date':due.isoformat(), 'plan':plan_names.get(plan_id) or str(contract.get('descricaoContratoBase') or 'Plano #'+str(plan_id)),
+            'basis':'dataValidade', 'source':'ContratoCliente'})
+    return sorted(result, key=lambda r:(r['date'], r['client_name'] or '', r['id']))
+
+
+def normalize(movements, receivables, payables, clients=(), contracts=(), plans=()):
     movements, dm = unique(movements, 'id')
     receivables, dr = unique(receivables, 'id')
     payables, dp = unique(payables, 'Id')
+    clients, dc = unique(clients, 'id')
+    contracts, dt = unique(contracts, 'id')
+    plans, db = unique(plans, 'id')
+    names = {identifier(c['id']):str(c.get('nome') or '').strip() for c in clients}
     rows = []
     issues = Counter()
     # Verified NextFit-generated template. Exclude BOTH legs only when each has
@@ -156,21 +204,28 @@ def normalize(movements, receivables, payables):
     transfer_label = 'Transferência de conta Next Fit Pay para conta bancária'
     transfer_groups = {}
     for item in movements:
-        if (item.get('descricao') == transfer_label and item.get('status') == 'Efetivado'
+        if (item.get('descricao') == transfer_label and item.get('status') in ('Efetivado', 'AguardandoEfetivacao')
                 and item.get('tipoMetodo') == 'Transferencia'
                 and not item.get('codigoCliente') and not item.get('codigoFornecedor')
                 and item.get('codigoContaFinanc') is not None):
             key = (item.get('dataEfetivacao'), cents(item['valor']))
             transfer_groups.setdefault(key, []).append(item)
     internal = set()
+    pending_internal = set()
+    unmatched_internal = set()
     for group in transfer_groups.values():
         if (len(group) == 2 and {r.get('tipo') for r in group} == {'Entrada','Saida'}
                 and group[0]['codigoContaFinanc'] != group[1]['codigoContaFinanc']):
-            internal.update(r['id'] for r in group)
+            if all(r['status'] == 'Efetivado' for r in group):
+                internal.update(r['id'] for r in group)
+            else:
+                pending_internal.update(r['id'] for r in group)
+                issues['pending_internal_transfer'] += 1
         else:
             issues['unmatched_internal_transfer'] += len(group)
+            unmatched_internal.update(r['id'] for r in group)
 
-    def add(key, when, amount, direction, state, label, source):
+    def add(key, when, amount, direction, state, label, source, client_id=None, review=None):
         if not when:
             issues['missing_date'] += 1
             return
@@ -179,7 +234,9 @@ def normalize(movements, receivables, payables):
             return
         if amount:
             rows.append(dict(id=key, date=when.isoformat(), amount=amount,
-                             direction=direction, state=state, label=label, source=source))
+                             direction=direction, state=state, label=label, source=source,
+                             client_id=identifier(client_id), client_name=names.get(identifier(client_id)) or None,
+                             transfer_review=review))
 
     for item in movements:
         direction = {'Entrada': 'in', 'Saida': 'out', 'Saída': 'out'}.get(item.get('tipo'))
@@ -193,7 +250,8 @@ def normalize(movements, receivables, payables):
         actual = status == 'Efetivado'
         add('mov:'+str(item['id']), day(item.get('dataEfetivacao') if actual else item.get('dataMovimentacao')),
             cents(item['valor']), direction, 'internal' if item['id'] in internal else 'actual' if actual else 'settlement',
-            str(item.get('descricao') or 'Movimento financeiro'), 'MovimentoFinanceiro')
+            str(item.get('descricao') or 'Movimento financeiro'), 'MovimentoFinanceiro', item.get('codigoCliente'),
+            'pending_counterpart' if item['id'] in pending_internal else 'unmatched' if item['id'] in unmatched_internal else None)
 
     for item in receivables:
         status = item.get('status')
@@ -209,7 +267,7 @@ def normalize(movements, receivables, payables):
             continue
         amount = cents(payment['saldo'] if payment else item['valor'])
         add('rec:'+str(item['id']), day(item.get('dataVencimento')), amount, 'in', 'open',
-            str(item.get('descricao') or 'Cobrança '+str(item['id'])), 'ContaReceber')
+            str(item.get('descricao') or 'Cobrança '+str(item['id'])), 'ContaReceber', item.get('codigoCliente'))
 
     for item in payables:
         # Live schema: 1=open; 2 and 3 are not a reliable cash ledger. Settled
@@ -229,9 +287,10 @@ def normalize(movements, receivables, payables):
     # A pending settlement and an open invoice may refer to the same cash event.
     # The API has no cross-source key. Keep settlements separately, never add
     # them to projected totals. This sacrifices completeness, not correctness.
-    return {'rows': rows, 'read_at': datetime.now(TZ).isoformat(), 'quality': {
-        'source_counts': {'movements': len(movements), 'receivables': len(receivables), 'payables': len(payables)},
-        'duplicate_ids_removed': dm + dr + dp,
+    return {'rows': rows, 'renewals':renewal_candidates(clients, contracts, plans), 'read_at': datetime.now(TZ).isoformat(), 'quality': {
+        'source_counts': {'movements': len(movements), 'receivables': len(receivables), 'payables': len(payables),
+                          'clients':len(clients), 'contracts':len(contracts), 'plans':len(plans)},
+        'duplicate_ids_removed': dm + dr + dp + dc + dt + db,
         'internal_transfer_pairs': len(internal)//2,
         'payables_status_counts': dict(Counter(str(x.get('Status')) for x in payables)),
         'issues': dict(issues),
@@ -253,6 +312,7 @@ def dashboard(selected: date, snapshot=None, today=None):
     base_rows = [r for r in rows if r['state'] == 'actual' and r['direction'] == 'in'
                  and baseline.isoformat() <= r['date'] < baseline_end.isoformat()]
     selected_rows = [r for r in rows if selected.isoformat() <= r['date'] < end.isoformat()]
+    renewals = [r for r in snapshot.get('renewals', []) if r['date'] >= today.isoformat()]
     weeks = []
     for index, (start_day, end_day) in enumerate(((1,7),(8,15),(16,24),(25,calendar.monthrange(selected.year, selected.month)[1]))):
         start_date, end_date = selected.replace(day=start_day), selected.replace(day=end_day)
@@ -271,6 +331,7 @@ def dashboard(selected: date, snapshot=None, today=None):
             **totals, 'estimate': estimate, 'historical_future': historical_future,
             'projected_in': totals['actual_in']+totals['open_in']+estimate,
             'projected_out': totals['actual_out']+totals['open_out'],
+            'renewals':[r for r in renewals if start_date.isoformat() <= r['date'] <= end_date.isoformat()] if not closed else [],
             'rows': sorted(week_rows, key=lambda r:(r['date'],r['id']))})
     fields = ('actual_in','actual_out','open_in','open_out','estimate','projected_in','projected_out')
     summary = {key: sum(w[key] for w in weeks) for key in fields}
@@ -286,4 +347,7 @@ def dashboard(selected: date, snapshot=None, today=None):
             'overdue':[r for r in rows if r['state']=='open' and r['date'] < today.isoformat()],
             'settlements':[r for r in selected_rows if r['state']=='settlement'],
             'internal_transfers':[r for r in selected_rows if r['state']=='internal'],
+            'transfer_reviews':[r for r in rows if r.get('transfer_review')],
+            'transfer_review_effect':sum((r['amount'] if r['direction']=='in' else -r['amount'])
+                for r in selected_rows if r.get('transfer_review') and r['state']=='actual' and r['date'] <= today.isoformat()),
             'currency':'BRL', 'unit':'centavos'}

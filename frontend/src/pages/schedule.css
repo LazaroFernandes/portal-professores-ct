@@ -1,0 +1,9 @@
+.schedule-add,.schedule-add form,.schedule-summary,.schedule-shift { display:flex; align-items:end; gap:12px; flex-wrap:wrap }
+.schedule-add label,.schedule-summary label,.schedule-shift label { display:grid; gap:5px }
+.schedule-add select,.schedule-add input { min-width:220px }
+.schedule-summary { margin:16px 0; gap:24px }
+.schedule-summary span { display:grid; gap:5px }
+.schedule-day { display:grid; grid-template-columns:110px 1fr auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid #e5e7eb }
+.schedule-shift { margin:5px 0 }
+.schedule-shift input { max-width:125px }
+@media(max-width:600px) { .schedule-day { grid-template-columns:1fr auto } .schedule-day > div { grid-column:1 / -1; grid-row:2 } }

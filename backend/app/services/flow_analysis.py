@@ -54,7 +54,8 @@ def analyze(rows, teachers, start, end, stay):
         parts=raw.split(':'); return int(parts[0])*60+int(parts[1])
     real=[t for t in teachers if t.get('source')=='nextfit']
     test=[t for t in teachers if t.get('source')=='test']
-    scheduled=any(t.get('shifts') for t in real)
+    team=real+test
+    scheduled=any(t.get('shifts') for t in team)
     def count(team,day,minute):
         return sum(any(s['day']==day and clock(s['start'])<=minute<clock(s['end']) for s in t['shifts']) for t in team)
     def coverage(team,day,begin,finish):
@@ -95,20 +96,21 @@ def analyze(rows, teachers, start, end, stay):
                 peaks.append(peak_day)
             valid=bool(values) and bool(eligible) and not invalid
             mean=sum(values)/(3600*len(values)) if valid else None
-            low,high=coverage(real,day,minute,minute+60) if scheduled else (None,None)
+            low,high=coverage(team,day,minute,minute+60) if scheduled else (None,None)
+            real_low,real_high=coverage(real,day,minute,minute+60)
             test_low,test_high=coverage(test,day,minute,minute+60)
             n4=math.ceil(mean/4) if mean is not None else None
             n3=math.ceil(mean/3) if mean is not None else None
             cells.append({'mean':mean,'peak':max(peaks) if valid else None,'days':len(ds),
                 'need4':n4,'need3':n3,'scheduled':low,'scheduled_max':high,
-                'test':test_high,'test_min':test_low,
+                'test':test_high,'test_min':test_low,'real_min':real_low,'real_max':real_high,
                 'missing4':max(0,n4-low) if n4 is not None and low is not None else None,
                 'missing4_min':max(0,n4-high) if n4 is not None and high is not None else None,
                 'missing3':max(0,n3-low) if n3 is not None and low is not None else None,
                 'missing3_min':max(0,n3-high) if n3 is not None and high is not None else None})
         label=f'{minute//60:02}:00–{minute//60+1:02}:00'
         result.append({'time':f'{minute//60:02}:00','label':label,'cells':cells})
-    return {'method':'hourly_time_weighted_v2','rows':result,'dates':[[d.isoformat() for d in ds] for ds in groups],'start':start.isoformat(),'end':end.isoformat(),'stay':stay,'eligible_records':eligible,'invalid_records':invalid,'unclassified_records':missing_mode,'schedule_available':scheduled,'data_available':bool(eligible) and not invalid}
+    return {'coverage_includes_test':True,'method':'hourly_time_weighted_v2','rows':result,'dates':[[d.isoformat() for d in ds] for ds in groups],'start':start.isoformat(),'end':end.isoformat(),'stay':stay,'eligible_records':eligible,'invalid_records':invalid,'unclassified_records':missing_mode,'schedule_available':scheduled,'data_available':bool(eligible) and not invalid}
 
 def overview(start,end,stay):
     rows,stamp=source(start,end)

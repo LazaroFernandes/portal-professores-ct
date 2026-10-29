@@ -7,3 +7,14 @@
 .schedule-shift { margin:5px 0 }
 .schedule-shift input { max-width:125px }
 @media(max-width:600px) { .schedule-day { grid-template-columns:1fr auto } .schedule-day > div { grid-column:1 / -1; grid-row:2 } }
+.schedule-picker { display:grid; gap:6px; max-width:340px; margin:16px 0 }
+.schedule-grid-wrap { overflow:auto; max-height:76vh; border:1px solid #d8dde5; border-radius:10px }
+.schedule-grid { width:100%; min-width:1050px; border-collapse:separate; border-spacing:0; table-layout:fixed }
+.schedule-grid th,.schedule-grid td { border-right:1px solid #e1e5ea; border-bottom:1px solid #e1e5ea; padding:8px; vertical-align:top }
+.schedule-grid thead th { position:sticky; top:0; background:#f1f4f8; z-index:2; text-align:left }
+.schedule-grid th:first-child { position:sticky; left:0; width:112px; background:#f1f4f8; z-index:1 }
+.schedule-grid thead th:first-child { z-index:3 }
+.schedule-cell { min-height:50px; display:flex; flex-direction:column; gap:4px }
+.schedule-person { background:#e0edff; color:#17396f; border-radius:5px; padding:3px 5px; overflow-wrap:anywhere; font-size:.83rem }
+.schedule-cell-button { align-self:flex-start; min-width:30px; min-height:28px; border:1px solid #c8d4e4; border-radius:5px; background:white; cursor:pointer }
+.schedule-cell-button:disabled { opacity:.35; cursor:not-allowed }

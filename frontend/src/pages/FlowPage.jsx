@@ -3,12 +3,23 @@ import {api} from '../api/client';
 import {Shell,ErrorBox} from './DailyWorkflow';
 import {days} from './scheduleUtils';
 import './flow.css';
+import {scenarios,summarizeScenarios} from './flowScenarios';
 const iso=d=>{const x=new Date();x.setDate(x.getDate()+d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;};
 const date=s=>s.split('-').reverse().join('/');
 const show=n=>n===null?'—':n;
-const range=(low,high)=>low===null?'—':low===high?low:`${low}–${high}`;
+const range=(low,high)=>low==null?'—':low===high?low:`${low}–${high}`;
+function ScenarioCard({label,caption,value,tone}) {
+ return <article className={`flow-overview-card ${tone}`}><span>{label}</span><strong>{value}</strong><small>{caption}</small></article>;
+}
+function CoveragePanel({label,caption,scenario,kind}) {
+ const state=scenario.missingMax==null?'unknown':scenario.missingMax>0?'deficit':'sufficient';
+ return <div className={`flow-scenario ${kind} ${state}`}><strong>{label}</strong><small>{caption}</small><b className="flow-count">{range(scenario.min,scenario.max)} <small>prof.</small></b><span className="flow-result">{state==='unknown'?'Sem dados':state==='sufficient'?'✓ Coberto':`Faltam ${range(scenario.missingMin,scenario.missingMax)}`}</span></div>;
+}
 export function FlowPage(){
  const [start,S]=useState(()=>iso(-14)),[end,E]=useState(()=>iso(-1)),[stay,T]=useState('90'),[data,D]=useState(null),[error,X]=useState(''),[loading,L]=useState(false);
+ const [ratio,R]=useState(4),[dayFilter,F]=useState('all'),[view,V]=useState('both');
+ const columns=days.map((name,index)=>({name,index})).filter(d=>dayFilter==='all'||d.index===Number(dayFilter));
+ const summary=data?summarizeScenarios(data.rows.flatMap(row=>columns.map(d=>row.cells[d.index])),ratio):null;
  async function load(e){e.preventDefault();D(null);X('');L(true);try{D(await api(`/api/admin/flow?start=${start}&end=${end}&stay=${stay}`));}catch(err){X(err.message);}finally{L(false);}}
  return <Shell title="Fluxo e cobertura" subtitle="Estimativa da musculação a partir dos acessos do NEXT e da escala prevista.">
  <form onSubmit={load} className="dw-toolbar"><label>De<input type="date" required value={start} max={end} onChange={e=>S(e.target.value)}/></label><label>Até<input type="date" required value={end} min={start} max={iso(-1)} onChange={e=>E(e.target.value)}/></label><label>Permanência estimada<select value={stay} onChange={e=>T(e.target.value)}><option value="90">1h30</option><option value="60">1h</option></select></label><button className="button" disabled={loading}>{loading?'Consultando NEXT…':'Consultar / atualizar'}</button></form>
@@ -20,11 +31,31 @@ export function FlowPage(){
  {!data.data_available&&<p className="notice error">Estimativas indisponíveis: {data.eligible_records===0?'nenhum acesso elegível foi retornado.':'há registros incompletos que impedem um cálculo confiável.'} Os traços não significam zero alunos. Registros inválidos: {data.invalid_records}; sem modalidade: {data.unclassified_records}.</p>}
  {data.unclassified_records>0&&<p className="notice error">{data.unclassified_records} acesso(s) sem modalidade foram excluídos. As estimativas podem estar subestimadas; os zeros representam ausência de entradas elegíveis retornadas, não confirmação de academia vazia.</p>}
  {!data.schedule_available&&<p className="notice error">Não há turnos cadastrados na escala, incluindo os de teste. A cobertura e as faltas estão indisponíveis.</p>}
- <p>Cada linha considera toda a faixa indicada, por exemplo 05:00–06:00. A média pondera o tempo de permanência de cada aluno durante a hora, com precisão de segundos. Entradas e inícios são incluídos; saídas estimadas e fins de turno são excluídos.</p>
+ <details className="flow-method"><summary>Como os cenários são calculados e limitações</summary><p>Cada linha considera toda a faixa indicada, por exemplo 05:00–06:00. A média pondera o tempo de permanência de cada aluno durante a hora, com precisão de segundos. Entradas e inícios são incluídos; saídas estimadas e fins de turno são excluídos.</p>
  <p>Média = total de aluno-minutos na faixa ÷ 60 ÷ datas do respectivo dia. Necessidade = média ÷ 4 ou ÷ 3, arredondada para cima, como referência constante para a hora. A cobertura total inclui professores do NEXT e professores de teste, conforme os horários salvos. Mostramos o mínimo e o máximo de professores simultâneos dentro da faixa. Os testes estão identificados e também reduzem as faltas; esse cenário é uma simulação e não confirma contratação ou presença. A falta varia conforme as trocas de turno: necessidade menos cobertura total em cada trecho, com mínimo zero. O destaque considera a maior falta na hora. O pico é a maior ocupação estimada em qualquer instante da faixa, entre todas as datas; pode superar bastante a média.</p>
  <details><summary>Datas e dias analisados</summary>{days.map((day,i)=><p key={day}><b>{day}: {data.dates[i].length} dia(s)</b> · {data.dates[i].map(date).join(', ')||'Nenhuma data no período'}</p>)}</details>
- <p className="dw-source">Todos os dias do período entram no denominador, inclusive datas sem passagens retornadas. O NEXT não fornece prova de funcionamento integral da catraca: ausência de registros pode indicar ausência de entradas ou falha de coleta. Não há comprovação independente de completude. A classificação usa a modalidade registrada no acesso. A escala semanal atual é aplicada ao período inteiro; não há histórico de alterações da escala.</p></section>
- <div className="flow-table-wrap"><table className="flow-table"><thead><tr><th>Faixa</th>{days.map((day,i)=><th key={day}>{day}<small>{data.dates[i].length} dia(s)</small></th>)}</tr></thead><tbody>{data.rows.map(row=><tr key={row.time}><th scope="row">{row.label}</th>{row.cells.map((c,i)=><td key={i} className={c.missing4>0?'flow-short':c.missing3>0?'flow-attention':''}><strong>Média: {c.mean===null?'—':c.mean.toLocaleString('pt-BR',{maximumFractionDigits:2})}</strong><span>Até 4 alunos/prof.: <b>{show(c.need4)}</b> prof.</span><span>3 alunos/prof.: <b>{show(c.need3)}</b> prof.</span><span>Cobertura total: <b>{range(c.scheduled,c.scheduled_max)}</b></span><span>Faltam (4): <b>{range(c.missing4_min,c.missing4)}</b> · (3): <b>{range(c.missing3_min,c.missing3)}</b></span>{c.test>0&&<em>Inclui teste: {range(c.test_min,c.test)}</em>}<details><summary>Pico e amostra</summary><span>Pico: {show(c.peak)} · {c.days} dia(s)</span><span>Professores do NEXT: {range(c.real_min,c.real_max)}</span></details></td>)}</tr>)}</tbody></table></div>
+ <p className="dw-source">Todos os dias do período entram no denominador, inclusive datas sem passagens retornadas. O NEXT não fornece prova de funcionamento integral da catraca: ausência de registros pode indicar ausência de entradas ou falha de coleta. Não há comprovação independente de completude. A classificação usa a modalidade registrada no acesso. A escala semanal atual é aplicada ao período inteiro; não há histórico de alterações da escala.</p></details></section>
+ <div className="flow-comparison-controls">
+ <label>Referência de atendimento<select value={ratio} onChange={e=>R(Number(e.target.value))}><option value={4}>Até 4 alunos por professor</option><option value={3}>Cerca de 3 alunos por professor</option></select></label>
+ <label>Dia da semana<select value={dayFilter} onChange={e=>F(e.target.value)}><option value="all">Semana completa</option>{days.map((day,i)=><option key={day} value={i}>{day}</option>)}</select></label>
+ <div className="flow-view-switch" role="group" aria-label="Visualização dos cenários">{[['both','Comparar'],['current','Atual'],['proposed','Novo com testes']].map(([value,label])=><button className={view===value?'active':''} aria-pressed={view===value} key={value} onClick={()=>V(value)}>{label}</button>)}</div>
+ </div>
+ <div className="flow-overview">
+ <ScenarioCard label="ATUAL · somente NEXT" value={summary.count?summary.current:'—'} caption="faixas com falta de professores" tone="current"/>
+ <ScenarioCard label="NOVO · NEXT + testes" value={summary.count?summary.proposed:'—'} caption="faixas ainda com falta" tone="proposed"/>
+ <ScenarioCard label="IMPACTO DA SIMULAÇÃO" value={summary.count?summary.resolved:'—'} caption={`faixas com falta zerada · ${summary.improved} melhoradas no total`} tone="impact"/>
+ </div>
+ <p className="flow-legend">Comparação de {summary.count} faixas dia/horário com dados nos filtros. Vermelho: falta em algum trecho da hora. Verde: cobertura suficiente para a referência média selecionada. Os mesmos alunos e a mesma necessidade são usados nos dois cenários. Testes representam simulação de escala, não presença efetiva.</p>
+ <div className="flow-table-wrap"><table className={`flow-table flow-comparison-table ${columns.length===1?'flow-table-single':''}`}><thead><tr><th>Faixa</th>{columns.map(({name,index})=><th key={name}>{name}<small>{data.dates[index].length} dia(s)</small></th>)}</tr></thead><tbody>{data.rows.map(row=><tr key={row.time}><th scope="row">{row.label}</th>{columns.map(({index})=>{const c=row.cells[index],s=scenarios(c,ratio);return <td key={index}>
+ <div className="flow-demand"><strong>{c.mean===null?'—':c.mean.toLocaleString('pt-BR',{maximumFractionDigits:2})}</strong><span>alunos simultâneos em média</span><b>Precisa: {show(s.need)} prof.</b></div>
+ <div className={`flow-scenarios ${view!=='both'?'single':''}`}>
+ {view!=='proposed'&&<CoveragePanel label="ATUAL" caption="Somente NEXT" scenario={s.current} kind="current"/>}
+ {view!=='current'&&<CoveragePanel label="NOVO" caption="NEXT + testes" scenario={s.proposed} kind="proposed"/>}
+ </div>
+ {c.test>0&&<span className="flow-test-badge">+ {range(c.test_min,c.test)} de teste no novo cenário</span>}
+ {s.improvement>0&&<span className="flow-improvement">↓ {s.improvement} a menos na maior falta da faixa</span>}
+ <details><summary>Pico e detalhes</summary><span>Pico: {show(c.peak)} alunos · {c.days} dia(s)</span><span>Referência: {ratio} alunos/professor</span><span>As faixas indicam o mínimo e o máximo dentro da hora. Médias podem esconder picos de demanda.</span></details>
+ </td>;})}</tr>)}</tbody></table></div>
  </>}
  </Shell>;
 }

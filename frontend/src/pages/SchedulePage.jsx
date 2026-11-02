@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { Shell, ErrorBox } from './DailyWorkflow';
 import './schedule.css';
+import {ReplicateSchedule} from './ReplicateSchedule.jsx';
 
 import { days, minutes, duration, hours, monthSummary, overlaps, coverageRange } from './scheduleUtils';
 const money = value => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -56,6 +57,7 @@ export function SchedulePage() {
     {teachers.map(t => { const weekly = t.shifts.reduce((n,s) => n + duration(s), 0), summary = monthSummary(t.shifts,month), monthly = summary.total; return <section className="dw-section schedule-card" key={t.id}>
       <div className="dw-section-head"><div><h2>{t.name}</h2>{t.source === 'test' && <div className="schedule-test-edit"><label>Nome do professor de teste<input maxLength={120} value={t.name} onChange={e => update(t.id,{name:e.target.value})}/></label><label>Cor<select value={t.color_group || 'blue'} onChange={e => update(t.id,{color_group:e.target.value})}><option value="rose">Rosa</option><option value="blue">Azul</option><option value="green">Verde</option></select></label></div>}<small>{t.source === 'test' ? 'Professor de teste' : 'Usuário do NEXT'}</small></div><button className="button" onClick={() => { if (window.confirm(`Remover ${t.name} desta escala?`)) change(teachers.filter(x => x.id !== t.id)); }}>Remover</button></div>
       <div className="schedule-summary"><label>Valor por hora (R$)<input type="number" min="0" max="100000" step="0.01" value={t.rate} onChange={e => update(t.id,{rate:e.target.value})}/></label><span>Por semana <strong>{hours(weekly)}</strong></span><span>No mês <strong>{hours(monthly)}</strong></span><span>Sábados no mês <strong>{summary.saturdays}</strong></span><span>Horas por sábado <strong>{hours(summary.perSaturday)}</strong></span><span>Horas de sábado no mês <strong>{hours(summary.saturdayMinutes)}</strong></span><span>Salário estimado <strong>{money(monthly * Number(t.rate || 0) / 60)}</strong></span></div>
+      <ReplicateSchedule teacher={t} onApply={shifts=>update(t.id,{shifts})}/>
       <details className="schedule-details"><summary>Ver e editar horários de {t.name}</summary>
       {days.map((day, index) => <div className="schedule-day" key={day}><strong>{day}</strong><div>{t.shifts.map((shift,i) => shift.day === index && <div className="schedule-shift" key={i}><label>Início<input type="time" value={shift.start.slice(0,5)} onChange={e => update(t.id,{shifts:t.shifts.map((s,j) => i === j ? {...s,start:e.target.value} : s)})}/></label><label>Fim<input type="time" value={shift.end.slice(0,5)} onChange={e => update(t.id,{shifts:t.shifts.map((s,j) => i === j ? {...s,end:e.target.value} : s)})}/></label><button className="button" aria-label={`Remover horário de ${day}`} onClick={() => update(t.id,{shifts:t.shifts.filter((_,j) => i !== j)})}>×</button></div>)}</div><button className="button" onClick={() => update(t.id,{shifts:[...t.shifts,{day:index,start:'08:00',end:'12:00'}]})}>+ Horário</button></div>)}
       </details>

@@ -5,6 +5,7 @@ import { Loading } from "./components/AsyncState";
 import { LoginPage } from "./pages/LoginPage";
 
 const FrequencyPage = lazy(() => import("./pages/FrequencyPage").then((module) => ({ default: module.FrequencyPage })));
+const SimulationPage = lazy(() => import("./pages/SimulationPage").then(m => ({default:m.SimulationPage})));
 const FlowPage = lazy(() => import("./pages/FlowPage").then(m => ({default:m.FlowPage})));
 const SchedulePage = lazy(() => import("./pages/SchedulePage").then((module) => ({ default: module.SchedulePage })));
 const FinancePage = lazy(() => import("./pages/FinancePage").then((module) => ({ default: module.FinancePage })));
@@ -27,6 +28,7 @@ export default function App() {
   const { session } = useAuth();
   return <Suspense fallback={<Loading label="Carregando modulo..." />}><Routes>
     <Route path="/login" element={<LoginPage />} />
+    <Route path="/admin/simulacao" element={<Protected roles={["admin"]}><SimulationPage /></Protected>} />
     <Route path="/admin/fluxo" element={<Protected roles={["admin"]}><FlowPage /></Protected>} />
     <Route path="/admin/horarios" element={<Protected roles={["admin"]}><SchedulePage /></Protected>} />
     <Route path="/admin/financeiro" element={<Protected roles={["admin"]}><FinancePage /></Protected>} />

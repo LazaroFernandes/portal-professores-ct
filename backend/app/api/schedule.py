@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import time
+from datetime import time, datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -10,6 +10,7 @@ from ..services.presence_service import _store
 
 router = APIRouter(prefix='/api/admin/schedule', tags=['admin'])
 KEY = 'teacher_schedule_v1'
+from ..services.schedule_simulation import KEY as SIMULATION_KEY
 
 class Shift(BaseModel):
     day: int = Field(ge=0, le=6)
@@ -73,3 +74,46 @@ def nextfit_users(response: Response, user=Depends(require_admin)):
         return {'users': sorted([{'id': str(u['id']), 'name': str(u['nome']).strip()} for u in users if u.get('id') is not None and u.get('nome') and not u.get('inativo')], key=lambda u: u['name'].casefold())}
     except Exception:
         raise HTTPException(503, 'Não foi possível consultar os usuários do NextFit. Tente novamente.') from None
+
+
+class SimulationOverride(BaseModel):
+    teacher_id: str = Field(min_length=1, max_length=100)
+    shifts: list[Shift] = Field(max_length=200)
+
+    @model_validator(mode='after')
+    def no_overlaps(self):
+        for day in range(7):
+            shifts = sorted((s for s in self.shifts if s.day == day), key=lambda s: s.start)
+            if any(a.end > b.start for a, b in zip(shifts, shifts[1:])):
+                raise ValueError('Há horários sobrepostos na simulação.')
+        return self
+
+
+class Simulation(BaseModel):
+    overrides: list[SimulationOverride] = Field(max_length=200)
+
+    @model_validator(mode='after')
+    def unique_ids(self):
+        if len({t.teacher_id for t in self.overrides}) != len(self.overrides):
+            raise ValueError('Professor duplicado na simulação.')
+        return self
+
+
+@router.get('/simulation')
+def get_simulation(response: Response, user=Depends(require_admin)):
+    response.headers['Cache-Control'] = 'no-store'
+    value = _store().state(SIMULATION_KEY)
+    return json.loads(value) if value else {'overrides': [], 'updated_at': None}
+
+
+@router.put('/simulation')
+def save_simulation(data: Simulation, response: Response, user=Depends(require_admin), csrf=Depends(require_csrf)):
+    response.headers['Cache-Control'] = 'no-store'
+    store = _store()
+    raw = store.state(KEY)
+    ids = {t['id'] for t in json.loads(raw).get('teachers', [])} if raw else set()
+    if any(t.teacher_id not in ids for t in data.overrides):
+        raise HTTPException(409, 'Há professores que não estão mais na escala. Recarregue a simulação e confira os ajustes.')
+    value = {**data.model_dump(mode='json'), 'updated_at': datetime.now(timezone.utc).isoformat()}
+    store.set_state(SIMULATION_KEY, json.dumps(value, ensure_ascii=False))
+    return value

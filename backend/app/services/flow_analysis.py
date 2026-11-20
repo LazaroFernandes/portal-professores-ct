@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from .presence_service import TIMEZONE, _nextfit_client, _store
+from .schedule_simulation import KEY as SIMULATION_KEY, proposed_teachers
 from .frequency_service import _normalized, _parse_datetime
 
 MODES = {'acessoria fixo', 'consultoria livre'}
@@ -24,7 +25,7 @@ def source(start, end):
         _cache[key] = (time.monotonic(), rows, stamp)
         return rows, stamp
 
-def analyze(rows, teachers, start, end, stay):
+def analyze(rows, teachers, start, end, stay, overrides=None):
     dates = [start + timedelta(days=i) for i in range((end-start).days+1)]
     groups = [[d for d in dates if d.weekday()==day] for day in range(7)]
     period_start=datetime.combine(start,datetime.min.time(),TIMEZONE)
@@ -53,9 +54,12 @@ def analyze(rows, teachers, start, end, stay):
     def clock(raw):
         parts=raw.split(':'); return int(parts[0])*60+int(parts[1])
     real=[t for t in teachers if t.get('source')=='nextfit']
-    test=[t for t in teachers if t.get('source')=='test']
-    team=real+test
-    scheduled=any(t.get('shifts') for t in team)
+    overrides=overrides or []
+    team=proposed_teachers(teachers,overrides)
+    test=[t for t in team if t.get('source')=='test']
+    ids={t.get('id') for t in teachers}
+    applied=[o for o in overrides if o['teacher_id'] in ids]
+    scheduled=any(t.get('shifts') for t in teachers+team) or bool(applied)
     def count(team,day,minute):
         return sum(any(s['day']==day and clock(s['start'])<=minute<clock(s['end']) for s in t['shifts']) for t in team)
     def coverage(team,day,begin,finish):
@@ -110,13 +114,16 @@ def analyze(rows, teachers, start, end, stay):
                 'missing3_min':max(0,n3-high) if n3 is not None and high is not None else None})
         label=f'{minute//60:02}:00–{minute//60+1:02}:00'
         result.append({'time':f'{minute//60:02}:00','label':label,'cells':cells})
-    return {'coverage_includes_test':True,'method':'hourly_time_weighted_v2','rows':result,'dates':[[d.isoformat() for d in ds] for ds in groups],'start':start.isoformat(),'end':end.isoformat(),'stay':stay,'eligible_records':eligible,'invalid_records':invalid,'unclassified_records':missing_mode,'schedule_available':scheduled,'data_available':bool(eligible) and not invalid}
+    return {'simulation_adjusted_teachers':len(applied),'simulation_ignored_teachers':len(overrides)-len(applied),'coverage_includes_test':True,'method':'hourly_time_weighted_v2','rows':result,'dates':[[d.isoformat() for d in ds] for ds in groups],'start':start.isoformat(),'end':end.isoformat(),'stay':stay,'eligible_records':eligible,'invalid_records':invalid,'unclassified_records':missing_mode,'schedule_available':scheduled,'data_available':bool(eligible) and not invalid}
 
 def overview(start,end,stay):
     rows,stamp=source(start,end)
     raw=_store().state('teacher_schedule_v1')
     teachers=json.loads(raw).get('teachers',[]) if raw else []
-    result=analyze(rows,teachers,start,end,stay)
+    simulation_raw=_store().state(SIMULATION_KEY)
+    simulation=json.loads(simulation_raw) if simulation_raw else {}
+    result=analyze(rows,teachers,start,end,stay,simulation.get('overrides',[]))
+    result['simulation_saved_at']=simulation.get('updated_at')
     result['updated_at']=stamp
     result['schedule_read_at']=datetime.now(TIMEZONE).isoformat()
     return result

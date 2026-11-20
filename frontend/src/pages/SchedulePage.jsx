@@ -13,7 +13,7 @@ function professorColor(teacher) {
   const id = teacher.id;
   const hash = [...id].reduce((value, char) => (Math.imul(value, 31) + char.charCodeAt(0)) >>> 0, 0);
   const hue = professorColors[id] ?? ({rose:330,green:145,blue:205}[teacher.color_group || 'blue'] + hash % 15);
-  return {backgroundColor:`hsl(${hue} 75% 93%)`, color:`hsl(${hue} 60% 23%)`, borderLeft:`4px solid hsl(${hue} 65% 40%)`};
+  return { '--teacher-hue': hue };
 }
 const clock = h => `${String(h).padStart(2,'0')}:00`;
 

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { Loading } from "./components/AsyncState";
+import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 
 const FrequencyPage = lazy(() => import("./pages/FrequencyPage").then((module) => ({ default: module.FrequencyPage })));
@@ -26,7 +27,7 @@ function Protected({ children, roles }) {
 
 export default function App() {
   const { session } = useAuth();
-  return <Suspense fallback={<Loading label="Carregando modulo..." />}><Routes>
+  return <Layout><Suspense fallback={<Loading label="Carregando modulo..." />}><Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route path="/admin/simulacao" element={<Protected roles={["admin"]}><SimulationPage /></Protected>} />
     <Route path="/admin/fluxo" element={<Protected roles={["admin"]}><FlowPage /></Protected>} />
@@ -42,5 +43,5 @@ export default function App() {
     <Route path="/registro" element={<Protected roles={["admin", "professor"]}><Navigate to="/academia" replace /></Protected>} />
     <Route path="/frequencia" element={<Navigate to="/vencimentos" replace />} />
     <Route path="*" element={<Navigate to={session?.role === "admin" ? "/admin/professores" : session?.role === "professor" ? "/academia" : "/login"} replace />} />
-  </Routes></Suspense>;
+  </Routes></Suspense></Layout>;
 }

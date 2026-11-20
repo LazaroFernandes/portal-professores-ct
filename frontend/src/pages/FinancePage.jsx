@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { LogOut, RefreshCw, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown } from 'lucide-react';
 import { api } from '../api/client';
-import { useAuth } from '../auth/AuthContext';
-import { AdminNav } from '../components/AdminNav';
 import { Loading, ErrorState } from '../components/AsyncState';
 import { Kpi, KpiGrid } from '../components/Kpi';
 import './finance.css';
@@ -39,7 +37,6 @@ function Renewals({ rows }) {
 }
 
 export function FinancePage() {
-  const { logout } = useAuth();
   const [month, setMonth] = useState(currentMonth);
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({loading:true, data:null, error:null});
@@ -63,9 +60,8 @@ export function FinancePage() {
   const overdueIn = data?.overdue.filter(r=>r.direction==='in').reduce((a,r)=>a+r.amount,0) || 0;
   const overdueOut = data?.overdue.filter(r=>r.direction==='out').reduce((a,r)=>a+r.amount,0) || 0;
   return <div className="page finance-page">
-    <AdminNav />
     <header className="page-heading"><div><span className="eyebrow">GESTÃO FINANCEIRA</span><h1>Seu caixa, semana a semana.</h1><p>Contas, entradas e projeção em uma única visão.</p></div>
-      <div className="frequency-actions"><button className="button ghost" onClick={logout}><LogOut size={17}/>Sair</button><button className="button primary" disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={17}/>Consultar</button></div></header>
+      <div className="frequency-actions"><button className="button primary" disabled={loading} onClick={()=>setRevision(v=>v+1)}><RefreshCw size={17}/>Consultar</button></div></header>
     <section className="finance-toolbar"><label>Mês de referência<input aria-label="Mês de referência" type="month" value={month} onChange={e=>{if(e.target.value)setMonth(e.target.value);}} /></label>
       <p>{data ? `${data.closed?'Mês encerrado · realizado':'Mês aberto · realizado + previsão'} · API NextFit` : 'Consulta financeira somente leitura'}</p></section>
     {loading ? <Loading label="Conferindo movimentos, recebimentos e contas no NextFit. A primeira consulta pode levar alguns minutos…"/> : error ? <ErrorState error={error} retry={()=>setRevision(v=>v+1)} /> : data && <>

@@ -1,9 +1,7 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, LogOut, RefreshCw, Search, Users, UserX } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, RefreshCw, Search, Users, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
 import { ErrorState, Loading } from "../components/AsyncState";
-import { AdminNav } from "../components/AdminNav";
 
 
 const updatedAt = new Intl.DateTimeFormat("pt-BR", {
@@ -81,7 +79,6 @@ function formatDueDays(value) {
 }
 
 export function FrequencyPage() {
-  const { logout } = useAuth();
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -122,11 +119,10 @@ export function FrequencyPage() {
     [pendingSearch, pendingSort, pendingStudents],
   );
 
-  if (!payload && !error) return <div className="page frequency-page"><AdminNav /><Loading /></div>;
+  if (!payload && !error) return <div className="page frequency-page"><Loading /></div>;
 
   const snapshot = payload?.snapshot;
   return <div className="page frequency-page">
-    <AdminNav />
     <div className="page-heading frequency-heading">
       <div>
         <span className="eyebrow">PLANOS</span>
@@ -136,7 +132,6 @@ export function FrequencyPage() {
           : "Os dados ainda não foram processados."}</p>
       </div>
       <div className="frequency-actions">
-        <button className="button ghost" onClick={logout}><LogOut size={17} /> Sair</button>
         <button className="button primary" onClick={refresh} disabled={refreshing}>
           <RefreshCw size={17} className={refreshing ? "spin" : ""} />
           {refreshing ? "Atualizando…" : "Atualizar agora"}

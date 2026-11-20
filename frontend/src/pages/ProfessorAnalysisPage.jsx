@@ -1,9 +1,7 @@
-import { ChevronLeft, ChevronRight, LogOut, RefreshCw, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { useAuth } from "../auth/AuthContext";
-import { AdminNav } from "../components/AdminNav";
 import { Empty, ErrorState, Loading } from "../components/AsyncState";
 import { Kpi, KpiGrid } from "../components/Kpi";
 import { currentWeek, filterStudents, shiftWeek, weekStart } from "./professorAnalysisUtils";
@@ -13,7 +11,6 @@ const dateLabel = (value) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" 
 const statusLabels = { complete: "Completo", partial: "Parcial", empty: "Em branco" };
 
 export function ProfessorAnalysisPage() {
-  const { logout } = useAuth();
   const [start, setStart] = useState(currentWeek);
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({ loading: true, data: null, error: null });
@@ -50,12 +47,10 @@ export function ProfessorAnalysisPage() {
   }
 
   return <div className="page professor-analysis">
-    <AdminNav />
     <header className="page-heading">
       <div><span className="eyebrow">GESTÃO DA EQUIPE</span><h1>Arquivo semanal antigo</h1>
         <p>Registros do formulário semanal anterior. O histórico semanal atual é consolidado automaticamente a partir dos registros diários.</p></div>
       <div className="frequency-actions">
-        <button className="button ghost" onClick={logout}><LogOut size={17} />Sair</button>
         <button className="button primary" disabled={loading} onClick={() => setRevision((n) => n + 1)}><RefreshCw size={17} className={loading ? "spin" : ""} />Atualizar análise</button>
       </div>
     </header>

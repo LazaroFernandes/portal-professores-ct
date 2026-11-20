@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, query } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { AdminNav } from '../components/AdminNav';
 import { TrainingDetails } from './PresencePage';
 import './daily.css';
 
@@ -17,8 +16,11 @@ export function useData(path, params) {
   return {data,error,loading,reload:()=>setRevision(v=>v+1)};
 }
 export function Shell({title,subtitle,children}) {
-  const {session,logout}=useAuth(); const {data}=useData('/api/daily/preview-info');
-  return <main className="dw page">{data?.enabled && <div className="dw-demo">PRÉVIA LOCAL · Dados fictícios · Nenhuma alteração no NextFit ou no portal publicado</div>}<header className="dw-header"><div><span className="eyebrow">CT ÍTALO VIEIRA · PORTAL DA EQUIPE</span><h1>{title}</h1><p>{subtitle}</p></div><div className="dw-user"><span>{session.name}<small>{session.role==='admin'?'Gerência':'Professor'}</small></span><button className="button" onClick={logout}>Sair</button></div></header><AdminNav/>{children}</main>;
+  const {data}=useData('/api/daily/preview-info');
+  return <div className="dw page">{data?.enabled && <div className="dw-demo">PRÉVIA LOCAL · Dados fictícios · Nenhuma alteração no NextFit ou no portal publicado</div>}
+    <header className="dw-header"><div><h1>{title}</h1><p>{subtitle}</p></div></header>
+    {children}
+  </div>;
 }
 export function ErrorBox({error}) {return error && <div className="notice error" role="alert">{error}</div>;}
 export function Badge({status}) {return <span className={`dw-badge ${status}`}>{labels[status]||status}</span>;}

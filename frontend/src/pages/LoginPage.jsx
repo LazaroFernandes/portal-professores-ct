@@ -1,4 +1,3 @@
-import { LockKeyhole } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -20,18 +19,17 @@ export function LoginPage() {
     try { await login(password); } catch (reason) { setError(reason.message); } finally { setBusy(false); }
   }
 
-  return <main className="login-page">
-    <section className="login-panel">
-      <div className="login-brand"><span>CT</span><div><strong>Ítalo Vieira</strong><small>Portal da equipe</small></div></div>
-      <div className="login-copy"><span className="eyebrow">ACESSO INTERNO</span><h1>Cada atendimento.<br />Um cuidado contínuo.</h1><p>Registre o dia, acompanhe as orientações e dê continuidade ao cuidado com cada aluno.</p></div>
-    </section>
-    <section className="login-form-wrap"><form className="login-form" onSubmit={submit}>
-      <div className="icon-box"><LockKeyhole /></div><h2>Acessar portal</h2><p>Use a senha administrativa ou individual do professor.</p>
-      {location.state?.message && <div className="notice">{location.state.message}</div>}
-      {error && <div className="notice error">{error}</div>}
-      <label>Senha<input autoFocus type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Digite sua senha" /></label>
-      <button className="button primary large" disabled={busy || !password}>{busy ? "Entrando…" : "Entrar"}</button>
-      <>{demo && <div className="notice"><strong>Prévia local · dados fictícios</strong><p>Professor: ProfessorDemo2026<br/>Gerente: GerenteDemo2026</p></div>}</><small className="security-note">Acesso protegido e restrito à equipe.</small>
-    </form></section>
-  </main>;
+  return <section className="portal-login" aria-labelledby="login-title">
+    <h1 id="login-title">CT Professores</h1>
+    <p>Registro diário e acompanhamento dos alunos.</p>
+    <h2>Entrar</h2>
+    <form onSubmit={submit}>
+      {location.state?.message && <div role="status" className="notice">{location.state.message}</div>}
+      <label>Senha<input name="password" type="password" autoComplete="current-password" required
+        value={password} onChange={event => setPassword(event.target.value)} /></label>
+      {error && <div className="notice error" role="alert">{error}</div>}
+      <button className="button primary" disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
+    </form>
+    {demo && <div className="notice"><strong>Prévia local · dados fictícios</strong><p>Professor: ProfessorDemo2026<br/>Gerente: GerenteDemo2026</p></div>}
+  </section>;
 }

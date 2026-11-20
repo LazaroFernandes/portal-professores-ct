@@ -25,3 +25,16 @@ it('counts real and test professors separately and respects changes within the h
  expect(coverageRange(teachers,0,300,360,'test')).toEqual({min:1,max:1});
  expect(coverageRange(teachers,1,300,360)).toEqual({min:0,max:0});
 });
+
+import {withMonthlySalary,hourlyValue} from './scheduleUtils';
+it('keeps salary fixed while the hourly value follows calendar hours, including minutes',()=>{
+ const t={salary:2260,rate:99,shifts:[{day:0,start:'08:00',end:'12:30'}]};
+ expect(withMonthlySalary(t,'2026-11').salary).toBe(2260);
+ expect(hourlyValue(2260,113*60)).toBe(20);
+ expect(hourlyValue(2260,120*60)).toBeCloseTo(18.833333);
+ expect(hourlyValue(100,150)).toBe(40);
+ expect(hourlyValue(0,60)).toBe(0);
+ expect(hourlyValue(2260,0)).toBeNull();expect(hourlyValue('',60)).toBeNull();
+ expect(withMonthlySalary({...t,salary:null,rate:20},'2026-11').salary).toBe(450);
+ expect(withMonthlySalary({...t,salary:0},'2026-11').salary).toBe(0);
+});

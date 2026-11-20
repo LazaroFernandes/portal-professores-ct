@@ -28,3 +28,10 @@ export function coverageRange(teachers, day, start, end, source = 'nextfit') {
   const counts = samples.map(point => team.filter(t => t.shifts.some(s => s.day === day && minutes(s.start) <= point && point < minutes(s.end))).length);
   return {min:Math.min(...counts), max:Math.max(...counts)};
 }
+
+export function withMonthlySalary(teacher, month) {
+ return {...teacher, salary:teacher.salary ?? Math.round(monthSummary(teacher.shifts,month).total * Number(teacher.rate || 0) / 60 * 100) / 100};
+}
+export function hourlyValue(salary, monthlyMinutes) {
+ return salary === '' || salary == null || monthlyMinutes <= 0 ? null : Number(salary) * 60 / monthlyMinutes;
+}

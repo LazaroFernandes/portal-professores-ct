@@ -11,7 +11,7 @@ function initialTheme() {
   catch { return "light"; }
 }
 
-function MobileMenu() {
+function MobileMenu({ name }) {
   const dialog = useRef(null);
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
@@ -25,7 +25,7 @@ function MobileMenu() {
   }, [pathname]);
 
   return <>
-    <button className="portal-menu-toggle" aria-haspopup="dialog" aria-controls="portal-menu" aria-expanded={open}
+    <button type="button" className="portal-menu-toggle" aria-haspopup="dialog" aria-controls="portal-menu" aria-expanded={open}
       onClick={() => { dialog.current.showModal(); setOpen(true); }}>
       <Menu size={18} aria-hidden="true" />Menu
     </button>
@@ -37,6 +37,7 @@ function MobileMenu() {
         <h2 id="portal-menu-title">Menu</h2>
         <button className="portal-icon" aria-label="Fechar menu" onClick={() => dialog.current.close()}><X size={20} /></button>
       </div>
+      <p className="portal-drawer-account"><strong>{name}</strong> · Gerência</p>
       <AdminNav onNavigate={() => dialog.current.close()} />
     </dialog>
   </>;
@@ -64,10 +65,10 @@ export function Layout({ children }) {
           {dark ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         {session && <button type="button" className="portal-signout" onClick={logout}><LogOut size={16} aria-hidden="true" />Sair</button>}
+        {session?.role === "admin" && <MobileMenu name={session.name} />}
       </div>
     </header>
     {session && <aside className="portal-side"><AdminNav /></aside>}
     <main id="portal-content" tabIndex={-1}>{children}</main>
-    {session?.role === "admin" && <MobileMenu />}
   </div>;
 }

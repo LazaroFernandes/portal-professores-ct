@@ -17,7 +17,7 @@ export function WeeklyHistoryPage() {
   const actionData = useData('/api/daily/actions');
   const summary = summarizeWeek(data?.students || [], { professor, search, situation });
   const activity = weeklyActions(actionData.data?.actions || [], { start, end, professor, search, clientIds: summary.students.map(s => s.client_id) });
-  return <Shell title="Histórico semanal" subtitle="A semana reunida a partir dos registros diários. O professor registra uma vez; a gerência acompanha a continuidade.">
+  return <Shell className="daily-page" title="Histórico semanal" subtitle="A semana reunida a partir dos registros diários. O professor registra uma vez; a gerência acompanha a continuidade.">
     <div className="dw-toolbar">
       <button className="button" onClick={() => setStart(shiftWeek(start, -1))}>← Semana anterior</button>
       <label>Semana de referência<input type="date" value={start} max={today()} onChange={e => { const value = weekStart(e.target.value); if (value) setStart(value); }}/></label>
@@ -57,7 +57,7 @@ export function WeeklyHistoryPage() {
         </>}
       </section>
       <section className="dw-section">
-        <h2>O que precisa da atenção do gerente</h2>
+        <div className="dw-section-head"><h2>O que precisa da atenção do gerente</h2></div>
         <p className="dw-source">Ocorrências da semana e pendências de preenchimento nos filtros selecionados. Uma ocorrência é um relato, não uma confirmação de problema ainda aberto.</p>
         {summary.students.filter(s => s.attention || s.pending).sort((a,b) => b.attention - a.attention).map(student => <details className="dw-week-student" key={student.client_id}>
           <summary><strong>{student.student_name}</strong> · {student.attention} ocorrência(s) · {student.pending} dia(s) sem registro</summary>
@@ -66,7 +66,7 @@ export function WeeklyHistoryPage() {
           {actionData.data && <p>{actionData.data.actions.filter(a => a.client_id === student.client_id && a.status !== 'resolved').length} acompanhamento(s) atualmente aberto(s) para este aluno. <Link to="/acoes">Ver responsáveis e prazos →</Link></p>}
           <button className="button" onClick={() => setHistory(student)}>Ver histórico e resultados</button>
         </details>)}
-        {!summary.students.some(s => s.attention || s.pending) && <p>Nenhuma ocorrência ou registro pendente neste recorte.</p>}
+        {!summary.students.some(s => s.attention || s.pending) && <div className="dw-empty">Nenhuma ocorrência ou registro pendente neste recorte.</div>}
       </section>
       <section className="dw-section"><div className="dw-section-head"><h2>Resumo por professor</h2><Link to="/acoes">Ações e retornos →</Link></div>
         <div className="dw-team">{summary.teams.map(team => <article key={team.name}><strong>{team.name}</strong><p>{team.registered} registrados · {team.not_observed} não observados · <b>{team.pending} sem registro</b></p><small>{team.total} acessos (aluno/dia)</small></article>)}</div>

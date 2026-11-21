@@ -1,3 +1,4 @@
+import "./management.css";
 import { ChevronLeft, ChevronRight, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";

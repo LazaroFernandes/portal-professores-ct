@@ -22,7 +22,7 @@ export function FlowPage(){
  const columns=days.map((name,index)=>({name,index})).filter(d=>dayFilter==='all'||d.index===Number(dayFilter));
  const summary=data?summarizeScenarios(data.rows.flatMap(row=>columns.map(d=>row.cells[d.index])),ratio):null;
  async function load(e){e.preventDefault();D(null);X('');L(true);try{D(await api(`/api/admin/flow?start=${start}&end=${end}&stay=${stay}`));}catch(err){X(err.message);}finally{L(false);}}
- return <Shell title="Fluxo e cobertura" subtitle="Estimativa da musculação a partir dos acessos do NEXT e da escala prevista.">
+ return <Shell className="flow-page" title="Fluxo e cobertura" subtitle="Estimativa da musculação a partir dos acessos do NEXT e da escala prevista.">
  <form onSubmit={load} className="dw-toolbar"><label>De<input type="date" required value={start} max={end} onChange={e=>S(e.target.value)}/></label><label>Até<input type="date" required value={end} min={start} max={iso(-1)} onChange={e=>E(e.target.value)}/></label><label>Permanência estimada<select value={stay} onChange={e=>T(e.target.value)}><option value="90">1h30</option><option value="60">1h</option></select></label><button className="button" disabled={loading}>{loading?'Consultando NEXT…':'Consultar / atualizar'}</button></form>
  <p>Somente acessos de ACESSORIA FIXO e CONSULTORIA LIVRE. Selecione até 62 dias completos, com término até ontem.</p>
  <p className="notice">A catraca registra a entrada; ela não comprova saída nem permanência na musculação. Cada pessoa é contada uma vez por instante, mesmo com passagens repetidas. A escala prevista não comprova presença do professor.</p>

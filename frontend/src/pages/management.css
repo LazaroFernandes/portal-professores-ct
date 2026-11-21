@@ -1,0 +1,130 @@
+.page:is(.professor-analysis, .frequency-page) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--portal-gap, 16px);
+}
+
+.portal-workspace :is(.professor-analysis, .frequency-page) > .page-heading,
+.professor-analysis > :is(p, .kpi-grid, .analysis-history-select, .analysis-section),
+.frequency-page > :is(.frequency-panel, .frequency-error) {
+  margin: 0;
+}
+
+.professor-analysis :is(.analysis-period, .analysis-section, .kpi),
+.frequency-page :is(.frequency-card, .frequency-panel, .frequency-empty) {
+  padding: var(--portal-inset, 20px);
+  min-width: 0;
+}
+
+.professor-analysis :is(.analysis-period, .analysis-section, .analysis-filters, .kpi-grid),
+.frequency-page :is(.frequency-grid, .frequency-panel) {
+  gap: var(--portal-gap, 16px);
+}
+
+.professor-analysis .analysis-period {
+  align-items: end;
+}
+
+.professor-analysis .analysis-week > .button {
+  min-height: 42px;
+}
+
+.analysis-week > .button[aria-label] {
+  width: 42px;
+  padding-inline: 0;
+}
+
+.professor-analysis .analysis-section,
+.frequency-page .frequency-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.professor-analysis :is(.analysis-section-heading, .analysis-filters),
+.frequency-page .frequency-search {
+  margin: 0;
+}
+
+.professor-analysis .analysis-section-heading {
+  flex-wrap: wrap;
+  gap: var(--portal-gap, 16px);
+  align-items: end;
+}
+
+.professor-analysis :is(.analysis-section-heading, .analysis-filters) label {
+  min-width: 0;
+}
+
+.professor-analysis .analysis-filters {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr));
+}
+
+.professor-analysis .analysis-footnote {
+  padding-top: 0;
+}
+
+.frequency-page .frequency-card {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  row-gap: var(--portal-gap, 16px);
+}
+
+.frequency-card > :is(p, .button) {
+  margin: 0;
+}
+
+.frequency-page .frequency-search {
+  width: min(100%, 380px);
+  max-width: none;
+}
+
+.frequency-page .frequency-search input {
+  width: 100%;
+}
+
+.frequency-page .frequency-search svg {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+@media (max-width: 720px) {
+  .portal-workspace :is(.professor-analysis, .frequency-page) > .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .analysis-period .analysis-week {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .analysis-period .analysis-week label {
+    min-width: 0;
+  }
+
+  .professor-analysis .analysis-week > .button {
+    min-height: 44px;
+  }
+
+  .analysis-week > .button[aria-label] {
+    width: 44px;
+  }
+
+  .analysis-week > .button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .professor-analysis .analysis-section-heading {
+    align-items: stretch;
+  }
+
+  .frequency-page .frequency-table tbody {
+    display: grid;
+    gap: var(--portal-gap, 12px);
+  }
+
+  .frequency-page .frequency-table tr {
+    margin: 0;
+  }
+}

@@ -1,3 +1,4 @@
+import "./management.css";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, RefreshCw, Search, Users, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";

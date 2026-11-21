@@ -71,19 +71,21 @@ export function FinancePage() {
         <Kpi label={data.closed?'Saídas do mês':'Saídas previstas'} value={money(s.projected_out)} detail={`${money(s.actual_out)} realizados · ${money(s.open_out)} a pagar`}/>
         <Kpi label={data.closed?'Saldo do período':'Saldo projetado'} value={money(balance)} tone={balance>=0?'good':'warning'} detail="Sem saldo bancário inicial; não é lucro"/></KpiGrid>
       <section className="finance-baseline"><div><span className="eyebrow">BASE DA PREVISÃO</span><h2>{monthLabel(data.baseline.month)}</h2><strong>{money(data.baseline.amount)} recebidos</strong></div><p>O histórico de recebimentos contratuais serve como base, incluindo matrículas e renovações já pagas. A estimativa usa os dias futuros equivalentes do mês-base e desconta as cobranças abertas previstas. Novas matrículas não são identificadas separadamente pela API financeira.</p></section>
-      <div className="finance-section-heading"><div><h2>Comparação semanal</h2><p>Abra uma semana para consultar os lançamentos. Períodos fixos: 01–07, 08–15, 16–24 e 25–fim.</p></div></div>
-      <div className="finance-column-titles"><span>Contas e despesas</span><span>Entradas de caixa</span><span>Sobra ou falta</span></div>
-      <div className="finance-weeks" key={month}>{data.weeks.map(w=>{
-        const net=w.projected_in-w.projected_out;
-        return <details className="finance-week" key={w.id}><summary><div className="finance-week-title"><span>SEMANA {w.id} · {dayLabel(w.start)}–{dayLabel(w.end)}</span><span className="finance-expand">Detalhes <ChevronDown size={17}/></span></div><div className="finance-week-values">
-          <div><small>Saídas</small><strong>{money(w.projected_out)}</strong><span>{money(w.open_out)} a pagar</span></div>
-          <div><small>Entradas</small><strong>{money(w.projected_in)}</strong><span>{money(w.actual_in)} realizados · {money(w.estimate)} estimados</span></div>
-          <div className={net>=0?'finance-positive':'finance-negative'}><small>{net>=0?'Sobra de caixa':'Falta de caixa'}</small><strong>{money(net)}</strong><span>{data.closed?'Realizado':'Realizado + previsto'}</span></div>
-        </div></summary><div className="finance-week-content"><div className="finance-detail-grid"><Transactions rows={w.rows} direction="out"/><Transactions rows={w.rows} direction="in"/></div>
-          {!data.closed && w.end >= data.today && <Renewals rows={w.renewals || []}/>}
-          {w.estimate>0 && <div className="finance-estimate"><strong>Estimativa histórica adicional: {money(w.estimate)}</strong><p>Não é uma cobrança emitida nem uma matrícula confirmada. Saldo sem essa estimativa: {money(net-w.estimate)}.</p></div>}
-        </div></details>;
-      })}</div>
+      <section className="finance-weekly">
+        <div className="finance-section-heading"><div><h2>Comparação semanal</h2><p>Abra uma semana para consultar os lançamentos. Períodos fixos: 01–07, 08–15, 16–24 e 25–fim.</p></div></div>
+        <div className="finance-column-titles"><span>Contas e despesas</span><span>Entradas de caixa</span><span>Sobra ou falta</span></div>
+        <div className="finance-weeks" key={month}>{data.weeks.map(w=>{
+          const net=w.projected_in-w.projected_out;
+          return <details className="finance-week" key={w.id}><summary><div className="finance-week-title"><span>SEMANA {w.id} · {dayLabel(w.start)}–{dayLabel(w.end)}</span><span className="finance-expand">Detalhes <ChevronDown size={17}/></span></div><div className="finance-week-values">
+            <div><small>Saídas</small><strong>{money(w.projected_out)}</strong><span>{money(w.open_out)} a pagar</span></div>
+            <div><small>Entradas</small><strong>{money(w.projected_in)}</strong><span>{money(w.actual_in)} realizados · {money(w.estimate)} estimados</span></div>
+            <div className={net>=0?'finance-positive':'finance-negative'}><small>{net>=0?'Sobra de caixa':'Falta de caixa'}</small><strong>{money(net)}</strong><span>{data.closed?'Realizado':'Realizado + previsto'}</span></div>
+          </div></summary><div className="finance-week-content"><div className="finance-detail-grid"><Transactions rows={w.rows} direction="out"/><Transactions rows={w.rows} direction="in"/></div>
+            {!data.closed && w.end >= data.today && <Renewals rows={w.renewals || []}/>}
+            {w.estimate>0 && <div className="finance-estimate"><strong>Estimativa histórica adicional: {money(w.estimate)}</strong><p>Não é uma cobrança emitida nem uma matrícula confirmada. Saldo sem essa estimativa: {money(net-w.estimate)}.</p></div>}
+          </div></details>;
+        })}</div>
+      </section>
       <section className="finance-history"><h2>Retroativo mês a mês</h2><p>Valores realizados por data de efetivação. Clique para abrir um mês.</p><div className="finance-history-grid">{data.history.map(h=><button type="button" className={h.month===month?'selected':''} aria-pressed={h.month===month} key={h.month} onClick={()=>setMonth(h.month)}><strong>{monthLabel(h.month)}</strong><small>{h.closed?'Encerrado':'Em andamento'}</small><span>Entradas <b>{money(h.in)}</b></span><span>Saídas <b>{money(h.out)}</b></span><span className={h.in>=h.out?'finance-positive':'finance-negative'}>Saldo <b>{money(h.in-h.out)}</b></span></button>)}</div></section>
       <details className="finance-extra"><summary>Contas vencidas ainda abertas · receber {money(overdueIn)} · pagar {money(overdueOut)}</summary><p>Situação atual, inclusive ao consultar meses anteriores. Não foram transferidas automaticamente para a previsão desta semana.</p><div className="finance-detail-grid"><Transactions rows={data.overdue} direction="out"/><Transactions rows={data.overdue} direction="in"/></div></details>
       <details className="finance-extra"><summary>Repasses aguardando efetivação · {data.settlements.length} lançamentos</summary><p>Fora do realizado e dos totais previstos, pois a API não oferece vínculo seguro para descartar sobreposição com cobranças abertas. A data abaixo é a movimentação de origem, não promessa de repasse.</p><div className="finance-detail-grid"><Transactions rows={data.settlements} direction="out"/><Transactions rows={data.settlements} direction="in"/></div></details>

@@ -1,7 +1,7 @@
 /* Keep the schedule's cards aligned, with one gutter for headings, controls and notes. */
 .schedule-page {
-  --schedule-inset: 20px;
-  --schedule-gap: 16px;
+  --schedule-inset: var(--portal-inset);
+  --schedule-gap: var(--portal-gap);
   container-type: inline-size;
 }
 
@@ -52,9 +52,6 @@
 @container (min-width: 875px) {
   .schedule-setup { grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
   .schedule-setup:has(.schedule-calculation[open]) { align-items: start; }
-}
-@media (max-width: 700px) {
-  .schedule-page { --schedule-inset: 14px; --schedule-gap: 12px; }
 }
 @media (max-width: 360px) {
   .schedule-add-group { display: grid; }

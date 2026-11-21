@@ -15,9 +15,9 @@ export function useData(path, params) {
   useEffect(()=> { let active=true; setLoading(true); setError(''); query(path,JSON.parse(key)).then(d=>{if(active)setData(d);}).catch(e=>{if(active){setError(failure(e));setData(null);}}).finally(()=>{if(active)setLoading(false);}); return ()=>{active=false;}; },[path,key,revision]);
   return {data,error,loading,reload:()=>setRevision(v=>v+1)};
 }
-export function Shell({title,subtitle,children}) {
+export function Shell({title,subtitle,children,className}) {
   const {data}=useData('/api/daily/preview-info');
-  return <div className="dw page">{data?.enabled && <div className="dw-demo">PRÉVIA LOCAL · Dados fictícios · Nenhuma alteração no NextFit ou no portal publicado</div>}
+  return <div className={className ? `dw page ${className}` : "dw page"}>{data?.enabled && <div className="dw-demo">PRÉVIA LOCAL · Dados fictícios · Nenhuma alteração no NextFit ou no portal publicado</div>}
     <header className="dw-header"><div><h1>{title}</h1><p>{subtitle}</p></div></header>
     {children}
   </div>;

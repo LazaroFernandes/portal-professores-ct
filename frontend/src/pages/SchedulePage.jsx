@@ -41,29 +41,73 @@ export function SchedulePage() {
     if (matching >= 0) update(selected, {shifts: selectedTeacher.shifts.filter((_,i) => i !== matching)});
     else if (!selectedTeacher.shifts.some(s => overlaps(s,day,start,end))) update(selected, {shifts:[...selectedTeacher.shifts,{day,start:clock(hour),end:clock(hour+1)}]});
   }
-  return <Shell title="Horários e salários" subtitle="Monte uma escala semanal e simule a remuneração da equipe.">
-    <p className="dw-source">Selecione os profissionais cadastrados no NEXT ou inclua nomes de teste. A lista do NEXT mostra usuários ativos; confirme quais são professores. A escala e os valores são visíveis somente para a administração.</p>
-    <ErrorBox error={error}/>{usersError && <div className="notice error">{usersError} <button className="button" onClick={loadUsers}>Tentar novamente</button></div>}
+  return <Shell className="schedule-page" title="Horários e salários" subtitle="Monte uma escala semanal e simule a remuneração da equipe.">
+    <div className="schedule-layout">
+    <ErrorBox error={error}/>
+    {usersError && <div className="notice error">{usersError} <button className="button" onClick={loadUsers}>Tentar novamente</button></div>}
     {loading ? <p>Carregando horários…</p> : loadFailed ? <p>Não foi possível carregar a escala salva. Atualize a página para tentar novamente.</p> : <>
-    <div className="schedule-add dw-section"><label>Adicionar usuário do NEXT<select value={chosen} onChange={e => setChosen(e.target.value)}><option value="">Selecione um usuário</option>{users.filter(u => !teachers.some(t => t.id === `nextfit:${u.id}`)).map(u => <option value={u.id} key={u.id}>{u.name}</option>)}</select></label><button className="button" disabled={!chosen} onClick={addNext}>Adicionar</button>
-      <form onSubmit={addTest}><label>Professor para teste<input value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Nome do professor" /></label><button className="button" disabled={!name.trim()}>Incluir teste</button></form></div>
-    <div className="dw-toolbar"><label>Mês da simulação<input type="month" value={month} onChange={e => setMonth(e.target.value)}/></label><strong>Total de salários mensais: {money(total)}</strong></div>
-    <p className="dw-source">Preencha o salário mensal total. Valor por hora = salário mensal ÷ horas previstas no mês selecionado, contando os dias reais do calendário. O salário informado permanece fixo; o valor por hora muda ao alterar o mês ou a escala. A mesma escala se repete em todos os sábados. As horas de sábado já estão incluídas no total. Não inclui faltas, feriados, adicionais ou encargos. Horários devem começar e terminar no mesmo dia.</p>
+    <div className="schedule-setup">
+      <section className="dw-section schedule-panel">
+        <h2>Equipe da escala</h2>
+        <p className="schedule-help">A lista do NEXT mostra usuários ativos. Confirme quais são professores ou inclua um nome de teste. A escala e os valores são visíveis somente para a administração.</p>
+        <div className="schedule-add">
+          <div className="schedule-add-group">
+            <label>Adicionar usuário do NEXT
+              <select value={chosen} onChange={e => setChosen(e.target.value)}>
+                <option value="">Selecione um usuário</option>
+                {users.filter(u => !teachers.some(t => t.id === `nextfit:${u.id}`)).map(u => <option value={u.id} key={u.id}>{u.name}</option>)}
+              </select>
+            </label>
+            <button className="button" disabled={!chosen} onClick={addNext}>Adicionar</button>
+          </div>
+          <form className="schedule-add-group" onSubmit={addTest}>
+            <label>Professor para teste
+              <input value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Nome do professor" />
+            </label>
+            <button className="button" disabled={!name.trim()}>Incluir teste</button>
+          </form>
+        </div>
+      </section>
+      <section className="dw-section schedule-panel schedule-month">
+        <div className="schedule-month-fields">
+          <label>Mês da simulação<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label>
+          <div className="schedule-month-total"><span>Total de salários mensais</span><strong>{money(total)}</strong></div>
+        </div>
+        <details className="schedule-calculation">
+          <summary>Como o valor por hora é calculado</summary>
+          <p className="schedule-help">Preencha o salário mensal total. Valor por hora = salário mensal ÷ horas previstas no mês selecionado, contando os dias reais do calendário. O salário informado permanece fixo. O valor por hora muda ao alterar o mês ou a escala. A mesma escala se repete em todos os sábados, e essas horas já estão incluídas no total. O cálculo desconsidera faltas, feriados, adicionais e encargos. Horários devem começar e terminar no mesmo dia.</p>
+        </details>
+      </section>
+    </div>
     {salaryMigration && <p className="notice">{salaryMigration}</p>}
     {!teachers.length && <p>Adicione um professor para começar a montar a escala.</p>}
-    <section className="dw-section"><div className="dw-section-head"><div><h2>Quadro semanal da equipe</h2><p>Selecione um professor e clique nas células para adicionar ou remover horas inteiras. Para horários com minutos, use os detalhes abaixo.</p></div></div>
-      <label className="schedule-picker">Professor para editar<select value={selected} onChange={e => setSelected(e.target.value)}><option value="">Selecione um professor</option>{teachers.map(t => <option value={t.id} key={t.id}>{t.name}{t.source === 'test' ? ' (teste)' : ''}</option>)}</select></label>
-      <div className="schedule-grid-wrap"><table className="schedule-grid"><thead><tr><th scope="col">Horário</th>{days.map(day => <th scope="col" key={day}>{day}</th>)}</tr></thead><tbody>
+    <section className="dw-section schedule-board">
+      <div className="schedule-board-header">
+        <div>
+          <h2>Quadro semanal da equipe</h2>
+          <p className="schedule-help">Selecione um professor e clique nas células para editar horas inteiras. Para ajustar os minutos, use os detalhes abaixo da grade.</p>
+        </div>
+        <label className="schedule-picker">Professor para editar
+          <select value={selected} onChange={e => setSelected(e.target.value)}>
+            <option value="">Selecione um professor</option>
+            {teachers.map(t => <option value={t.id} key={t.id}>{t.name}{t.source === 'test' ? ' (teste)' : ''}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="schedule-grid-wrap" role="region" aria-label="Grade de horários" tabIndex={0}><table className="schedule-grid"><thead><tr><th scope="col">Horário</th>{days.map(day => <th scope="col" key={day}>{day}</th>)}</tr></thead><tbody>
       {Array.from({length:17},(_,i) => i+5).map(hour => <tr key={hour}><th scope="row">{clock(hour)}–{clock(hour+1)}</th>{days.map((day,index) => { const start=hour*60, end=start+60; const totalCoverage=coverageRange(teachers,index,start,end,null); const testCoverage=coverageRange(teachers,index,start,end,'test'); const present=teachers.filter(t => t.shifts.some(s => overlaps(s,index,start,end))); const exact=selectedTeacher?.shifts.some(s => s.day===index && minutes(s.start)===start && minutes(s.end)===end); const partial=selectedTeacher?.shifts.some(s => overlaps(s,index,start,end)) && !exact; return <td key={day}><div className="schedule-cell"><strong className="schedule-coverage">{coverageLabel(totalCoverage)}</strong>{testCoverage.max > 0 && <small className="schedule-test-coverage">Inclui {coverageLabel(testCoverage)} de teste</small>}{present.map(t => <span className="schedule-person" style={professorColor(t)} key={t.id}>{t.name}{t.source === 'test' ? ' · teste' : ''}<small>{t.shifts.filter(s => overlaps(s,index,start,end)).map(s => ` ${s.start.slice(0,5)}–${s.end.slice(0,5)}`).join(',')}</small></span>)}<button type="button" className="schedule-cell-button" disabled={!selectedTeacher || partial} onClick={() => toggleSlot(index,hour)} aria-label={`${exact ? 'Remover' : 'Adicionar'} ${selectedTeacher?.name || 'professor'}: ${day} ${clock(hour)} às ${clock(hour+1)}`} title={partial ? 'Ajuste este horário nos detalhes do professor' : ''}>{exact ? '−' : '+'}</button></div></td>; })}</tr>)}
-      </tbody></table></div><p className="dw-source">A grade mostra intervalos das 5h às 22h. A contagem inclui os professores de teste previstos; a quantidade de testes incluída aparece indicada abaixo do total. Se a cobertura mudar dentro da hora, mostramos o mínimo e o máximo (ex.: 1–2). Qualquer horário salvo fora dessa faixa continua disponível nos detalhes do professor.</p></section>
+      </tbody></table></div><p className="schedule-help schedule-grid-note">A grade mostra intervalos das 5h às 22h. A contagem inclui os professores de teste previstos; a quantidade de testes incluída aparece indicada abaixo do total. Se a cobertura mudar dentro da hora, mostramos o mínimo e o máximo (ex.: 1–2). Qualquer horário salvo fora dessa faixa continua disponível nos detalhes do professor.</p></section>
     {teachers.map(t => { const weekly = t.shifts.reduce((n,s) => n + duration(s), 0), summary = monthSummary(t.shifts,month), monthly = summary.total, hourly = hourlyValue(t.salary,monthly); return <section className="dw-section schedule-card" key={t.id}>
       <div className="dw-section-head"><div><h2>{t.name}</h2>{t.source === 'test' && <div className="schedule-test-edit"><label>Nome do professor de teste<input maxLength={120} value={t.name} onChange={e => update(t.id,{name:e.target.value})}/></label><label>Cor<select value={t.color_group || 'blue'} onChange={e => update(t.id,{color_group:e.target.value})}><option value="rose">Rosa</option><option value="blue">Azul</option><option value="green">Verde</option></select></label></div>}<small>{t.source === 'test' ? 'Professor de teste' : 'Usuário do NEXT'}</small></div><button className="button" onClick={() => { if (window.confirm(`Remover ${t.name} desta escala?`)) change(teachers.filter(x => x.id !== t.id)); }}>Remover</button></div>
+      <div className="schedule-card-body">
       <div className="schedule-summary"><label>Salário mensal total (R$)<input type="number" min="0" max="100000000" step="0.01" value={t.salary} onChange={e => update(t.id,{salary:e.target.value})}/></label><span>Por semana <strong>{hours(weekly)}</strong></span><span>No mês <strong>{hours(monthly)}</strong></span><span>Sábados no mês <strong>{summary.saturdays}</strong></span><span>Horas por sábado <strong>{hours(summary.perSaturday)}</strong></span><span>Horas de sábado no mês <strong>{hours(summary.saturdayMinutes)}</strong></span><span className="schedule-hourly">Valor por hora <strong>{hourly===null?'—':money(hourly)}</strong>{monthly===0 && <small>Cadastre horários para calcular</small>}</span></div>
       <ReplicateSchedule teacher={t} onApply={shifts=>update(t.id,{shifts})}/>
       <details className="schedule-details"><summary>Ver e editar horários de {t.name}</summary>
       {days.map((day, index) => <div className="schedule-day" key={day}><strong>{day}</strong><div>{t.shifts.map((shift,i) => shift.day === index && <div className="schedule-shift" key={i}><label>Início<input type="time" value={shift.start.slice(0,5)} onChange={e => update(t.id,{shifts:t.shifts.map((s,j) => i === j ? {...s,start:e.target.value} : s)})}/></label><label>Fim<input type="time" value={shift.end.slice(0,5)} onChange={e => update(t.id,{shifts:t.shifts.map((s,j) => i === j ? {...s,end:e.target.value} : s)})}/></label><button className="button" aria-label={`Remover horário de ${day}`} onClick={() => update(t.id,{shifts:t.shifts.filter((_,j) => i !== j)})}>×</button></div>)}</div><button className="button" onClick={() => update(t.id,{shifts:[...t.shifts,{day:index,start:'08:00',end:'12:00'}]})}>+ Horário</button></div>)}
       </details>
+      </div>
     </section>; })}
-    <div className="schedule-save-bar"><span role="status">{message || (dirty ? 'Alterações não salvas' : 'Horários atualizados')}</span><button className="schedule-save-button" disabled={!dirty || saving} onClick={save}>{saving ? 'Salvando…' : 'Salvar horários'}</button></div></>}
+    <div className={`schedule-save-bar${dirty || saving ? " is-pending" : ""}`}><span role="status">{message || (dirty ? 'Alterações não salvas' : 'Horários atualizados')}</span><button className="schedule-save-button" disabled={!dirty || saving} onClick={save}>{saving ? 'Salvando…' : 'Salvar horários'}</button></div></>}
+    </div>
   </Shell>;
 }

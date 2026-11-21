@@ -1,13 +1,74 @@
-.schedule-add,.schedule-add form,.schedule-summary,.schedule-shift { display:flex; align-items:end; gap:12px; flex-wrap:wrap }
-.schedule-add label,.schedule-summary label,.schedule-shift label { display:grid; gap:5px }
-.schedule-add select,.schedule-add input { min-width:220px }
+/* Keep the schedule's cards aligned, with one gutter for headings, controls and notes. */
+.schedule-page {
+  --schedule-inset: 20px;
+  --schedule-gap: 16px;
+  container-type: inline-size;
+}
+
+.portal-workspace .schedule-page > .dw-header {
+  padding: 16px var(--schedule-inset);
+  margin-bottom: var(--schedule-gap);
+}
+
+.schedule-layout { display: grid; gap: var(--schedule-gap); }
+.schedule-layout > *,
+.schedule-setup > * { min-width: 0; margin-block: 0; }
+.schedule-setup { display: grid; gap: var(--schedule-gap); }
+.schedule-panel { padding: 14px var(--schedule-inset); }
+.schedule-help { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.schedule-panel > .schedule-help { max-width: 84ch; }
+.schedule-add { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-top: 10px; }
+.schedule-add-group { display: flex; align-items: end; flex: 1 1 235px; gap: 8px; min-width: 0; }
+.schedule-add-group label { flex: 1; min-width: 0; }
+.schedule-add-group .button { flex: none; white-space: nowrap; }
+.schedule-add-group :is(input, select) { min-width: 0; }
+.schedule-month { display: grid; align-content: start; gap: 12px; }
+.schedule-month-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px; }
+.schedule-month-total { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+.schedule-month-total strong { color: var(--ink); font-size: 20px; line-height: 1.3; }
+.schedule-calculation { padding-top: 10px; border-top: 1px solid var(--line); }
+.schedule-calculation summary { cursor: pointer; color: var(--accent-text); font-size: 13px; font-weight: 600; }
+
+.schedule-board-header {
+  display: grid;
+  gap: 12px;
+  align-items: end;
+  padding: 14px var(--schedule-inset);
+}
+.schedule-board-header > div { min-width: 0; }
+.schedule-picker { min-width: 0; max-width: 340px; }
+.schedule-grid-note { margin: 0; padding: 12px var(--schedule-inset); }
+.schedule-board .schedule-grid-wrap { border-inline: 0; border-radius: 0; }
+.schedule-board .schedule-grid-wrap:focus-visible { outline-offset: -2px; }
+.schedule-card .dw-section-head { padding: 14px var(--schedule-inset); }
+.schedule-card-body { padding: 14px var(--schedule-inset); }
+.schedule-card-body .schedule-summary { margin: 0; }
+.schedule-layout > .schedule-save-bar { position: static; margin: 0; }
+.schedule-layout > .schedule-save-bar.is-pending { position: sticky; }
+
+@container (min-width: 690px) {
+  .schedule-board-header { grid-template-columns: minmax(0,1fr) minmax(220px,30%); }
+}
+@container (min-width: 875px) {
+  .schedule-setup { grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
+  .schedule-setup:has(.schedule-calculation[open]) { align-items: start; }
+}
+@media (max-width: 700px) {
+  .schedule-page { --schedule-inset: 14px; --schedule-gap: 12px; }
+}
+@media (max-width: 360px) {
+  .schedule-add-group { display: grid; }
+  .schedule-add-group .button { justify-self: start; }
+}
+
+.schedule-summary,.schedule-shift { display:flex; align-items:end; gap:12px; flex-wrap:wrap }
+.schedule-summary label,.schedule-shift label { display:grid; gap:5px }
 .schedule-summary { margin:16px 0; gap:24px }
 .schedule-summary span { display:grid; gap:5px }
 .schedule-day { display:grid; grid-template-columns:110px 1fr auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--line) }
 .schedule-shift { margin:5px 0 }
 .schedule-shift input { max-width:125px }
 @media(max-width:600px) { .schedule-day { grid-template-columns:1fr auto } .schedule-day > div { grid-column:1 / -1; grid-row:2 } }
-.schedule-picker { display:grid; gap:6px; max-width:340px; margin:16px 0 }
 .schedule-grid-wrap { overflow:auto; max-height:76vh; border:1px solid var(--line); border-radius:10px }
 .schedule-grid { width:100%; min-width:1050px; border-collapse:separate; border-spacing:0; table-layout:fixed }
 .schedule-grid th,.schedule-grid td { border-right:1px solid var(--line); border-bottom:1px solid var(--line); padding:8px; vertical-align:top }

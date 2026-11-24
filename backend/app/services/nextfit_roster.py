@@ -8,15 +8,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from nextfit_client import NextFitClient
 
-# User-confirmed active team, resolved against NextFit users on 2026-10-22.
+# User-confirmed active team, resolved against NextFit users on 2026-11-24.
 ACTIVE_PROFESSORS = (
     (28143012, 'Anderson Da Silva Santos'),
-    (17884992, 'Katiucy Lauser'),
     (28143132, 'Lucas Eduardo Fiorio'),
-    (32248190, 'Lucas Siqueira'),
     (38099218, 'Tais Passos'),
     (38099183, 'Camila Vargas'),
     (38099701, 'Daniel de Oliveira da Rosa'),
+    (40586720, 'Willian Carlos Freire'),
 )
 TTL_SECONDS = 120
 _lock = threading.Lock()
@@ -30,9 +29,12 @@ def normalize(value):
 
 def canonical_professor(name):
     aliases = {normalize(full): full for _, full in ACTIVE_PROFESSORS}
-    aliases.update({normalize(short): full for short, (_, full) in zip(
-        ('ANDERSON', 'KATIUCY', 'LUCAS FIORIO', 'LUCAS SIQUEIRA', 'TAIS', 'CAMILA', 'DANIEL'), ACTIVE_PROFESSORS)})
-    aliases[normalize('Lucas Eduardo Fiore')] = 'Lucas Eduardo Fiorio'
+    for _, full in ACTIVE_PROFESSORS:
+        if full == 'Lucas Eduardo Fiorio':
+            aliases[normalize('Lucas Fiorio')] = full
+            aliases[normalize('Lucas Eduardo Fiore')] = full
+        else:
+            aliases[normalize(full.split()[0])] = full
     return aliases.get(normalize(name))
 
 

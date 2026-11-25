@@ -13,9 +13,11 @@ from controle_professores.semana import fmt_iso, label_semana, parse_iso, semana
 from ..core.cache import cache
 
 
-def _alunos() -> list[dict]:
+def _alunos(*, refresh: bool = False) -> list[dict]:
     from .nextfit_roster import current_roster
-    students = current_roster()["students"]
+    students = current_roster(refresh=refresh)["students"]
+    if refresh:
+        cache.invalidate("controle:alunos")
     # Preserve only the locally managed shift, never the legacy teacher assignment.
     try:
         rows = (cache.get_or_set("controle:alunos:postgres", 120, postgres_data.read_alunos)
@@ -48,15 +50,60 @@ def resolve_professor(user: dict, requested: str | None) -> str:
     return selected
 
 
-def _students_for(professor: str) -> list[dict]:
+def _students_for(professor: str, *, refresh: bool = False) -> list[dict]:
     return sorted(
         [
-            row for row in _alunos()
+            row for row in _alunos(refresh=refresh)
             if str(row.get("Status") or "").strip().upper() == "ATIVO"
             and str(row.get("Professor") or "").strip().casefold() == professor.casefold()
         ],
         key=lambda row: str(row.get("Nome") or "").casefold(),
     )
+
+
+def students_payload(
+    user: dict,
+    requested_professor: str | None = None,
+    *,
+    refresh: bool = False,
+) -> dict:
+    professor = resolve_professor(user, requested_professor)
+    students = _students_for(professor, refresh=refresh)
+    items = []
+    shift_counts = {"MANHÃ": 0, "TARDE": 0, "NOITE": 0, "unassigned": 0}
+    for student in students:
+        try:
+            client_id = int(student["ClienteId"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        shift = str(student.get("Turno") or "").strip()
+        shift_upper = shift.upper()
+        if shift_upper in ("MANHÃ", "TARDE", "NOITE"):
+            shift_counts[shift_upper] += 1
+        else:
+            shift_counts["unassigned"] += 1
+        items.append({
+            "client_id": client_id,
+            "name": str(student.get("Nome") or "").strip(),
+            "shift": shift,
+            "plan": str(student.get("Plano") or "").strip(),
+            "modality": str(student.get("Modalidade") or "").strip(),
+            "status": str(student.get("Status") or "").strip(),
+            "updated_at": str(student.get("AtualizadoEm") or "").strip(),
+        })
+    return {
+        "professor": professor,
+        "professors": professores_disponiveis() if user.get("role") == "admin" else [professor],
+        "total": len(items),
+        "summary": {
+            "total": len(items),
+            "morning": shift_counts["MANHÃ"],
+            "afternoon": shift_counts["TARDE"],
+            "evening": shift_counts["NOITE"],
+            "unassigned": shift_counts["unassigned"],
+        },
+        "students": items,
+    }
 
 
 def _week_index(professor: str, start: date) -> dict[int, dict]:

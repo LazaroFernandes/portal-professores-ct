@@ -78,10 +78,10 @@ def build_students(clients, users, contracts):
     return result
 
 
-def current_roster():
+def current_roster(*, refresh: bool = False):
     global _snapshot, _expires
     with _lock:
-        if _snapshot is not None and time.monotonic() < _expires:
+        if not refresh and _snapshot is not None and time.monotonic() < _expires:
             return _snapshot
         key = os.environ.get('NEXTFIT_API_KEY', '').strip()
         base = os.environ.get('NEXTFIT_BASE_URL', '').strip()

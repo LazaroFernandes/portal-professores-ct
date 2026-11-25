@@ -13,6 +13,22 @@ def _bad_request(exc: Exception) -> HTTPException:
     return HTTPException(status_code=code, detail=str(exc))
 
 
+@router.get("/students")
+def get_students(
+    professor: str | None = None,
+    refresh: bool = False,
+    user: dict = Depends(current_user),
+) -> dict:
+    if user.get("role") not in {"professor", "admin"}:
+        raise HTTPException(403, "Acesso restrito à equipe do portal")
+    try:
+        return professor_service.students_payload(user, professor, refresh=refresh)
+    except (ValueError, PermissionError) as exc:
+        raise _bad_request(exc) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, "Carteira indisponível. Tente novamente.") from exc
+
+
 @router.get("/week")
 def get_week(
     start: str | None = None,

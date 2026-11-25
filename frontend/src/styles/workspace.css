@@ -205,7 +205,7 @@ body:has(.portal-drawer[open]) { overflow: hidden; }
     max-width: 440px; margin-inline: auto; padding: 4px;
     border: 1px solid var(--line); border-radius: 28px; background: var(--surface);
   }
-  .professor .portal-nav-group { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 2px; }
+  .professor .portal-nav-group { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 2px; }
   .professor .portal-nav-group h2 { display: none; }
   .professor .portal-nav a { flex-direction: column; justify-content: center; gap: 2px; min-height: 46px; border-radius: 18px; padding: 5px 2px; font-size: 10px; }
   .portal-workspace .schedule-save-bar { flex-wrap: wrap; }

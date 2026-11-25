@@ -1,9 +1,10 @@
-import { Activity, CalendarCheck, CalendarDays, ChartNoAxesColumn, ClipboardCheck, ClipboardList, Clock, History, ListTodo, Wallet } from "lucide-react";
+import { Activity, CalendarCheck, CalendarDays, ChartNoAxesColumn, ClipboardCheck, ClipboardList, Clock, History, ListTodo, Users, Wallet } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const dailyLinks = [
   ["/academia", ClipboardCheck, "Registro diário"],
+  ["/alunos", Users, "Alunos"],
   ["/acoes", ClipboardList, "Ações e retornos"],
   ["/pendencias", ListTodo, "Pendências"],
 ];

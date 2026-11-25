@@ -25,7 +25,7 @@ class DailyWorkflowTests(unittest.TestCase):
         self.app=FastAPI();self.app.include_router(router);self.app.include_router(weekly_router)
         self.app.dependency_overrides[current_user]=lambda:self.user
         self.client=TestClient(self.app);self.headers={'X-CSRF-Token':'test'}
-        self.body={'contact':'accompanied','outcome':'completed','pain':'no','follow_up':False,'note':'','version':0}
+        self.body={'contact':'accompanied','performance_score':8,'outcome':None,'pain':'no','follow_up':False,'note':'','version':0}
 
     def tearDown(self):
         for p in reversed(self.patches):p.stop()
@@ -57,16 +57,26 @@ class DailyWorkflowTests(unittest.TestCase):
         self.assertEqual(self.save({**self.body,'version':1,'note':'Correção'}).status_code,200)
         self.assertEqual(len(self.client.get('/api/daily/students/1/history').json()['records'][0]['edits']),2)
 
-    def test_explicit_assessment_and_conditional_note(self):
-        for body in [{'contact':'accompanied','follow_up':False},{**self.body,'pain':'yes'},{**self.body,'outcome':'adapted'},{**self.body,'follow_up':True},{**self.body,'contact':'not_observed'}]:
+    def test_explicit_assessment_and_optional_note(self):
+        for body in [
+            {'contact':'accompanied','follow_up':False},
+            {'contact':'accompanied','performance_score':8,'follow_up':False},
+            {'contact':'accompanied','pain':'no','follow_up':False},
+            {**self.body,'performance_score':-1},
+            {**self.body,'performance_score':11},
+        ]:
             self.assertEqual(self.save(body).status_code,422)
-        self.assertEqual(self.save({**self.body,'outcome':'unknown','pain':'unknown'}).status_code,200)
+        self.assertEqual(self.save({**self.body,'performance_score':0,'pain':'no','note':''}).status_code,200)
+        self.assertEqual(self.save({**self.body,'version':1,'performance_score':10,'pain':'yes','note':''}).status_code,200)
+        self.assertEqual(self.get_action()['title'],'Desconforto relatado · Desempenho 10/10')
+        self.assertEqual(self.save({**self.body,'version':2,'performance_score':None,'outcome':'unknown','pain':'unknown','note':''}).status_code,200)
 
     def test_not_observed_is_separate_and_does_not_claim_performance(self):
-        self.assertEqual(self.save({**self.body,'contact':'not_observed','note':'Não observei.'}).status_code,200)
+        self.assertEqual(self.save({**self.body,'contact':'not_observed','note':''}).status_code,200)
         result=self.client.get('/api/daily').json()
         self.assertEqual(result['summary'],{'total':1,'registered':0,'not_observed':1,'pending':0})
         self.assertIsNone(result['students'][0]['record']['pain'])
+        self.assertIsNone(result['students'][0]['record']['performance_score'])
         self.assertEqual(result['students'][0]['performance'],'Registro diário')
 
     def test_manager_assignment_teacher_resolution_and_audit(self):

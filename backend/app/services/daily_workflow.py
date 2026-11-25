@@ -72,6 +72,21 @@ def _create_action(s, c, visit, user, title, stamp, reopen=False):
     return aid
 
 
+def _auto_action_title(data) -> str:
+    if data.note:
+        return data.note
+    parts = []
+    if data.pain == 'yes':
+        parts.append('Desconforto relatado')
+    if data.outcome == 'interrupted':
+        parts.append('Treino interrompido')
+    if data.follow_up:
+        parts.append('Retorno da equipe solicitado')
+    if data.performance_score is not None:
+        parts.append(f'Desempenho {data.performance_score}/10')
+    return ' · '.join(parts) or 'Acompanhamento solicitado no registro diário'
+
+
 def save_record(visit_id, data, user):
     assignments = roster()
     s = store()
@@ -105,7 +120,7 @@ def save_record(visit_id, data, user):
             s._execute(c, 'UPDATE portal_gym_visits SET finished_at=?, finished_by=? WHERE id=?', (stamp, user['name'], visit_id))
             # Automatic review for reported pain or an interrupted workout, even without an explicit request.
             if data.follow_up or data.pain == 'yes' or data.outcome == 'interrupted':
-                _create_action(s, c, visit, user, data.note, stamp, reopen=not old or json.loads(old['payload']) != body)
+                _create_action(s, c, visit, user, _auto_action_title(data), stamp, reopen=not old or json.loads(old['payload']) != body)
             audit(s, c, 'record', visit_id, user, {'before': json.loads(old['payload']) if old else None, 'after': body, 'legacy_before': legacy_before, 'version': version+1}, stamp)
     return {'saved': True, 'version': version+1}
 

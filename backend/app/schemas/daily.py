@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator, ConfigDict
 class DailyRecord(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     contact: Literal['accompanied', 'not_observed']
+    performance_score: int | None = Field(default=None, ge=0, le=10)
     outcome: Literal['completed', 'adapted', 'interrupted', 'unknown'] | None = None
     pain: Literal['no', 'yes', 'unknown'] | None = None
     note: str = Field(default='', max_length=3000)
@@ -14,13 +15,12 @@ class DailyRecord(BaseModel):
 
     @model_validator(mode='after')
     def validate_record(self):
-        if self.contact == 'accompanied' and (not self.outcome or not self.pain):
-            raise ValueError('Informe como foi o treino e se houve desconforto, ou selecione não avaliado.')
+        if self.contact == 'accompanied' and ((self.performance_score is None and not self.outcome) or not self.pain):
+            raise ValueError('Informe o desempenho de 0 a 10 e se houve desconforto relatado.')
         if self.contact == 'not_observed':
+            self.performance_score = None
             self.outcome = None
             self.pain = None
-        if (self.contact == 'not_observed' or self.outcome in ('adapted', 'interrupted') or self.pain == 'yes' or self.follow_up) and not self.note:
-            raise ValueError('Descreva o motivo, a ocorrência ou o retorno necessário.')
         return self
 
 
